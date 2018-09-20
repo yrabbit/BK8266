@@ -47,26 +47,15 @@ DEPDIR=.dep
 
 
 ##############################################################################
-##  Additional flash sections
-##############################################################################
-
-FLASH_SECTIONS+= \
-	0x70000 httpfs/httpfs.bin
-
-##############################################################################
-
-
-##############################################################################
 ##  Compiler information
 ##############################################################################
-SDK=/home/heavy/KLAD/x-tools/esp8266/sdk
-export PATH := /home/heavy/KLAD/x-tools/esp8266/xtensa-lx106-elf/bin:$(PATH)
+SDK=../../../../Modules/SDK/ESP8266/NONOS_SDK_BY_HEAVY_v1.5.3
 BUILD_NUMBER=$(shell git rev-list --count HEAD)
 
-CC=xtensa-lx106-elf-gcc
-CPP=xtensa-lx106-elf-g++
-OBJCOPY=xtensa-lx106-elf-objcopy
-OBJDUMP=xtensa-lx106-elf-objdump
+CC="$(GCCESP8266PATH)\xtensa-lx106-elf-gcc.exe"
+CPP="$(GCCESP8266PATH)\xtensa-lx106-elf-g++.exe"
+OBJCOPY="$(GCCESP8266PATH)\xtensa-lx106-elf-objcopy.exe"
+OBJDUMP="$(GCCESP8266PATH)\xtensa-lx106-elf-objdump.exe"
 INCLUDES=-I$(SDK)/include -Isrc/
 CFLAGS=-Wall -Wshadow -DICACHE_FLASH -O3 -mlongcalls \
     -mtext-section-literals \
@@ -81,7 +70,7 @@ LIBS=-L$(SDK)/lib -lmain -lnet80211 -lwpa -llwip -lpp -lphy -Wl,--end-group -lgc
 LD_SCRIPT=ld/eagle.app.v6.ld
 LDFLAGS_BUILD_NUMBER=-Xlinker --defsym -Xlinker __BUILD_NUMBER__=$(BUILD_NUMBER)
 LDFLAGS=-nostdlib -Wl,--start-group $(LIBS) -Wl,--relax,--gc-sections $(LDFLAGS_BUILD_NUMBER)
-ESPTOOL=esptool.py --port /dev/ttyUSB0
+ESPTOOL2=$(PRJROOT)/Utils/esptool2/V2.0.0/esptool2.exe
 ##############################################################################
 
 
@@ -92,30 +81,12 @@ all: $(OUTDIR)/$(OUT).1.bin
 
 $(OUTDIR)/$(OUT).1.bin: $(OUTDIR)/$(OUT).1
 	@echo "Making user.bin..."; \
-	$(ESPTOOL) elf2image --output $(OUTDIR)/$(OUT).1.bin --version 2 --flash_size 4m $(OUTDIR)/$(OUT).1
+	$(ESPTOOL2) -quiet -bin -boot2 -4096 -qio -40 $^ $@ .text .data .rodata
 
 # Target for linker user1
 $(OUTDIR)/$(OUT).1: $(subst $(SRCDIR)/,$(OBJDIR)/$(SRCDIR)/,$(C_SOURCES:.c=.o)) $(subst $(SRCDIR)/,$(OBJDIR)/$(SRCDIR)/,$(CPP_SOURCES:.cpp=.o)) $(LIB_DEPS)
 	@echo "Linking..."; \
 	$(CPP) $(CPPFLAGS) -o $(OUTDIR)/$(OUT).1 -Wl,-Map,out/$(OUT).1.map $(subst $(SRCDIR)/,$(OBJDIR)/$(SRCDIR)/,$(C_SOURCES:.c=.o)) $(subst $(SRCDIR)/,$(OBJDIR)/$(SRCDIR)/,$(CPP_SOURCES:.cpp=.o)) -T$(LD_SCRIPT) $(LDFLAGS)
-
-# Target for flashing
-flash: $(OUTDIR)/$(OUT).1.bin
-	@echo "Flashing user1.bin..."; \
-	$(ESPTOOL) write_flash \
-	    --flash_size 8m \
-	    0x10000 $(OUTDIR)/$(OUT).1.bin	\
-	    $(FLASH_SECTIONS)
-
-# Target for resetting
-reset:
-	@echo "Resetting..."; \
-	$(ESPTOOL) run
-
-# Target for terminal
-term:
-	@echo "Terminal..."; \
-	telnet localhost 60485
 
 # Target for clean
 clean:
@@ -143,7 +114,7 @@ $(DEPDIR)/%.d: %.c
 	ONAME=`echo "$(OBJDIR)/$*.o" | sed -e 's/\\//\\\\\\//g' | sed -e 's/\\./\\\\\\./g'`; \
 	DNAME=`echo "$@" | sed -e 's/\\//\\\\\\//g' | sed -e 's/\\./\\\\\\./g'`; \
 	$(CC) -MM $(CFLAGS) $< \
-	| sed "s/.*:/$$ONAME $$DNAME : /g" > $@; \
+	| sed "1s/.*:/$$ONAME $$DNAME : /" > $@; \
 	[ -s $@ ] || rm -f $@
 
 # Rule for generation of dependency information
@@ -155,7 +126,7 @@ $(DEPDIR)/%.d: %.cpp
 	ONAME=`echo "$(OBJDIR)/$*.o" | sed -e 's/\\//\\\\\\//g' | sed -e 's/\\./\\\\\\./g'`; \
 	DNAME=`echo "$@" | sed -e 's/\\//\\\\\\//g' | sed -e 's/\\./\\\\\\./g'`; \
 	$(CPP) -MM $(CPPFLAGS) $< \
-	| sed "s/.*:/$$ONAME $$DNAME : /g" > $@; \
+	| sed "1s/.*:/$$ONAME $$DNAME : /" > $@; \
 	[ -s $@ ] || rm -f $@
 
 # Rule for compiling C files

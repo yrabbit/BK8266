@@ -1,1 +1,1 @@
-../../WiFiAPP/src/crc8.c
+#include "../../WiFiAPP/src/crc8.c"

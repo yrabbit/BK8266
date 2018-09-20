@@ -52,17 +52,16 @@ DEPDIR=.dep
 ##############################################################################
 ##  Compiler information
 ##############################################################################
-export PATH := /home/heavy/KLAD/x-tools/esp8266/xtensa-lx106-elf/bin:$(PATH)
 BUILD_NUMBER=$(shell git rev-list --count HEAD)
 
-CC=xtensa-lx106-elf-gcc
+CC="$(GCCESP8266PATH)\xtensa-lx106-elf-gcc.exe"
 INCLUDES=-I$(SRCDIR)
 CFLAGS=-O3 -Wall -Wl,-EL -fno-inline-functions -nostdlib -mlongcalls -mtext-section-literals -D__ets__ $(INCLUDES)
 LIBS=-lgcc
 LD_SCRIPT=ld/eagle.app.v6.ld
 LDFLAGS_BUILD_NUMBER=-Xlinker --defsym -Xlinker __BUILD_NUMBER__=$(BUILD_NUMBER)
 LDFLAGS=-nostdlib -Wl,--no-check-sections -u call_user_start -Wl,-static $(LIBS) $(LDFLAGS_BUILD_NUMBER)
-ESPTOOL=esptool.py
+ESPTOOL2=$(PRJROOT)/Utils/esptool2/V2.0.0/esptool2.exe
 ##############################################################################
 
 
@@ -73,32 +72,12 @@ all: $(OUTDIR)/$(OUT)-0x00000.bin
 
 $(OUTDIR)/$(OUT)-0x00000.bin: $(OUTDIR)/$(OUT)
 	@echo "Making $(OUT).bin..."; \
-	$(ESPTOOL) elf2image -e 1 -o $(OUTDIR)/$(OUT)- $^
+	$(ESPTOOL2) -quiet -bin -boot0 -4096 -qio -40 $^ $@ .text .data .rodata .bkrom.data
 
 # Target for linker
 $(OUTDIR)/$(OUT): $(subst $(SRCDIR)/,$(OBJDIR)/$(SRCDIR)/,$(C_SOURCES:.c=.o))
 	@echo "Linking..."; \
 	$(CC) $(CFLAGS) -o $@ -Wl,-Map,$(OUTDIR)/$(OUT).map $(subst $(SRCDIR)/,$(OBJDIR)/$(SRCDIR)/,$(C_SOURCES:.c=.o)) -T$(LD_SCRIPT) $(LDFLAGS)
-
-# Target for flashing
-flash: $(OUTDIR)/$(OUT)-0x00000.bin
-	@echo "Flashing..."; \
-	$(ESPTOOL) write_flash \
-	    --flash_size 8m \
-	    --flash_freq 20m \
-	    --flash_mode dio \
-	    0x01000 $(OUTDIR)/$(OUT)-0x00000.bin
-	$(ESPTOOL) run
-
-# Target for resetting
-reset:
-	@echo "Resetting..."; \
-	$(ESPTOOL) run
-
-# Target for terminal
-term:
-	@echo "Terminal..."; \
-	telnet localhost 60485
 
 # Target for clean
 clean:
@@ -126,7 +105,7 @@ $(DEPDIR)/%.d: %.c
 	ONAME=`echo "$(OBJDIR)/$*.o" | sed -e 's/\\//\\\\\\//g' | sed -e 's/\\./\\\\\\./g'`; \
 	DNAME=`echo "$@" | sed -e 's/\\//\\\\\\//g' | sed -e 's/\\./\\\\\\./g'`; \
 	$(CC) -MM $(CFLAGS) $< \
-	| sed "s/.*:/$$ONAME $$DNAME : /g" > $@; \
+	| sed "1s/.*:/$$ONAME $$DNAME : /" > $@; \
 	[ -s $@ ] || rm -f $@
 
 # Rule for compiling C files

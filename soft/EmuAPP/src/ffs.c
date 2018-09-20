@@ -1,1 +1,1 @@
-../../WiFiAPP/src/ffs.c
+#include "../../WiFiAPP/src/ffs.c"

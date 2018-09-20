@@ -43,16 +43,13 @@ DEPDIR=.dep
 ##############################################################################
 ##  Compiler information
 ##############################################################################
-export PATH := /home/heavy/KLAD/x-tools/esp8266/xtensa-lx106-elf/bin:$(PATH)
-
-CC=xtensa-lx106-elf-gcc
+CC="$(GCCESP8266PATH)\xtensa-lx106-elf-gcc.exe"
 INCLUDES=-I$(SRCDIR)
 CFLAGS=-Os -Wall -Wl,-EL -fno-inline-functions -nostdlib -mlongcalls -mtext-section-literals  -D__ets__ -DICACHE_FLASH $(INCLUDES)
 LIBS=
 LD_SCRIPT=$(SRCDIR)/eagle.app.v6.ld
 LDFLAGS=-nostdlib -Wl,--no-check-sections -u call_user_start -Wl,-static $(LIBS)
-ESPTOOL=esptool.py
-ESPTOOL2=/home/heavy/KLAD/x-tools/esp8266/esptool2/esptool2
+ESPTOOL2=$(PRJROOT)/Utils/esptool2/V2.0.0/esptool2.exe
 ##############################################################################
 
 
@@ -69,36 +66,6 @@ $(OUTDIR)/$(OUT).bin: $(OUTDIR)/$(OUT)
 $(OUTDIR)/$(OUT): $(subst $(SRCDIR)/,$(OBJDIR)/$(SRCDIR)/,$(C_SOURCES:.c=.o))
 	@echo "Linking..."; \
 	$(CC) $(CFLAGS) -o $@ -Wl,-Map,$(OUTDIR)/$(OUT).map $(subst $(SRCDIR)/,$(OBJDIR)/$(SRCDIR)/,$(C_SOURCES:.c=.o)) -T$(LD_SCRIPT) $(LDFLAGS)
-
-# Target for flashing
-flash: $(OUTDIR)/$(OUT).bin
-	@echo "Flashing..."; \
-	$(ESPTOOL) write_flash \
-	    --flash_size 8m \
-	    --flash_freq 20m \
-	    --flash_mode dio \
-	    0x00000 $(OUTDIR)/$(OUT).bin && \
-	$(ESPTOOL) run
-
-# Target for flashing
-flash2: $(OUTDIR)/$(OUT).bin
-	@echo "Flashing..."; \
-	$(ESPTOOL) write_flash \
-	    --flash_size 8m \
-	    --flash_freq 20m \
-	    --flash_mode dio \
-	    0x00000 $(OUTDIR)/$(OUT).bin \
-	    0x01000 $(OUTDIR)/app.bin
-
-# Target for resetting
-reset:
-	@echo "Resetting..."; \
-	$(ESPTOOL) run
-
-# Target for terminal
-term:
-	@echo "Terminal..."; \
-	telnet localhost 60485
 
 # Target for clean
 clean:

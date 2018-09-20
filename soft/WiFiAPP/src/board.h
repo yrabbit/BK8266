@@ -1,1 +1,1 @@
-../../board.h
+#include "../../board.h"
