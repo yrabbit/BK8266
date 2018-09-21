@@ -32,9 +32,9 @@ typedef struct FILE
 {
     uint16_t page;
     uint16_t size;
-    char     name[9];
+    char     name [16];
+    uint16_t reserved;
     uint8_t  type;
-    uint8_t  reserved;
     uint8_t  crc8;
 } FILE;
 
@@ -63,6 +63,7 @@ void ffs_remove(uint16_t n);
 int16_t ffs_rename(uint16_t n, const char *fname);
 
 const char* ffs_name(uint16_t n);	// в статической переменной
+const char* ffs_name_utf8 (uint16_t n); // в статической переменной
 
 
 #ifdef __cplusplus

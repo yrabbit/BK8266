@@ -151,7 +151,7 @@ const char* Web::getDir(uint32_t *dataPtr, int *size)
     {
 	if ( (fat[n].type != TYPE_REMOVED) &&
 	     (fat[n].type != TYPE_FREE) )
-	    dataSize+=25+os_strlen(ffs_name(n));
+	    dataSize+=25+os_strlen(ffs_name_utf8(n));
     }
     
     // Информация о размере флэша: flashInfo(0x00000000, 0x00000000);\n (len=35)
@@ -171,7 +171,7 @@ const char* Web::getDir(uint32_t *dataPtr, int *size)
 	if ( (fat[n].type != TYPE_REMOVED) &&
 	     (fat[n].type != TYPE_FREE) )
 	{
-	    ss+=os_sprintf(ss, "addFile(0x%02X,\"%s\",0x%04X);\n", fat[n].type, ffs_name(n), fat[n].size);
+	    ss+=os_sprintf(ss, "addFile(0x%02X,\"%s\",0x%04X);\n", fat[n].type, ffs_name_utf8(n), fat[n].size);
 	}
     }
     

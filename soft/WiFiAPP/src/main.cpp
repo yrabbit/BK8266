@@ -33,7 +33,7 @@ THREAD(status_thread)
 	    str[50]=0;
 	    
 	    // Заголовок
-	    os_strcpy(str+0, "РАДИО-86РК -->");
+	    os_strcpy(str+0, "БК-0010-01 -->");
 	    
 	    // Состояние подключения к WiFi
 	    switch (wifi_station_get_connect_status())

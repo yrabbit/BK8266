@@ -24,7 +24,9 @@ C_SOURCES+= \
 	src/tv.c		src/tv_data.c		\
 	src/ps2.c		src/ps2_codes.c		\
 	src/ffs.c		src/crc8.c		\
-	src/str.c		src/reboot.c
+	src/str.c		src/reboot.c	\
+	src/UTF8_KOI8.c \
+
 
 ##############################################################################
 

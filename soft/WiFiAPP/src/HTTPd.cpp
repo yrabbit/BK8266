@@ -6,6 +6,7 @@
 #include <spi_flash.h>
 #include <user_interface.h>
 #include "str.h"
+#include "UTF8_KOI8.h"
 
 
 #define DEBUG(...)	os_printf(__VA_ARGS__)
@@ -104,12 +105,7 @@ again:
         	{
         	    // Закачка
         	    char *path=buf+4;
-        	    for (char *ss=path; *ss; ss++)
-        		if ((*ss)==' ')
-        		{
-        		    (*ss)=0;
-        		    break;
-        		}
+        	    URL_UTF8_To_KOI8 (path, path);
         	    put.path=os_strdup(path);
         	    put.size=0;
         	} else
@@ -117,12 +113,7 @@ again:
         	{
         	    // Скачивание
         	    char *path=buf+4;
-        	    for (char *ss=path; *ss; ss++)
-        		if ((*ss)==' ')
-        		{
-        		    (*ss)=0;
-        		    break;
-        		}
+                URL_UTF8_To_KOI8 (path, path);
         	    get.path=os_strdup(path);
         	} else
         	if (! os_strncmp(buf_l, "content-length: ", 16))

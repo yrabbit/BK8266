@@ -8,19 +8,23 @@
 #endif
 #include "crc8.h"
 #include "str.h"
+#include "UTF8_KOI8.h"
 
 
 FILE fat[FAT_SIZE];
 static uint8_t free_sect[128];	// максимум 4мб
 static uint32_t f_size;
 
-
+#define DATA_FIRST_PAGE ((sizeof (fat) + 0xFFFUL) / 0x1000UL)
+#define DATA_FIRST_ADR  (DATA_FIRST_PAGE * 0x1000UL)
 
 #ifdef __ets__
     typedef unsigned int	uint32;
     #define spi_flash_read(addr, buf, size)	SPIRead(addr, buf, size)
     #define spi_flash_write(addr, buf, size)	SPIWrite(addr, buf, size)
     #define spi_flash_erase_sector(addr)	do { SPIUnlock(); SPIEraseSector(addr); } while(0)
+#else
+    #define ets_printf os_printf
 #endif
 
 
@@ -64,21 +68,21 @@ static void f_init(void)
 
 static void f_read(uint32_t pos, uint8_t *data, int size)
 {
-    ets_printf("f_read(0x%05X, %d)\n", pos, size);
+    ets_printf("f_read(0x%05lX, %d)\n", (unsigned long) pos, size);
     spi_flash_read(FFS_AT+pos, (uint32*)data, size);
 }
 
 
 static void f_write(uint32_t pos, const uint8_t *data, int size)
 {
-    ets_printf("f_write(0x%05X, %d)\n", pos, size);
+    ets_printf("f_write(0x%05lX, %d)\n", (unsigned long) pos, size);
     spi_flash_write(FFS_AT+pos, (const uint32*)data, size);
 }
 
 
 static void f_erase(uint32_t pos)
 {
-    ets_printf("f_erase(0x%05X)\n", pos);
+    ets_printf("f_erase(0x%05lX)\n", (unsigned long) pos);
     spi_flash_erase_sector((FFS_AT+pos) / 4096);
 }
 
@@ -86,14 +90,31 @@ static void f_erase(uint32_t pos)
 static void ffs_cvt_name(const char *name, char *tmp)
 {
     uint8_t i=0;
+    uint8_t Size=0;
+    char    Char;
     
-    while ( (i<8) && (name[i]) && (name[i]!='.') )
+    while ((i<16) && ((Char = *name++)!=0))
     {
-	tmp[i]=to_upper(name[i]);
-	i++;
+        if (((Char >= 0x7F) && (Char <  0xC0)) ||
+            ( Char <  0x20                   ) || 
+            ( Char == '\"'                   ) ||
+            ( Char ==  '*'                   ) ||
+            ( Char == '\\'                   ) ||
+            ( Char ==  '/'                   ) ||
+            ( Char ==  ':'                   ) ||
+            ( Char ==  '<'                   ) ||
+            ( Char ==  '>'                   ) ||
+            ( Char ==  '?'                   ) ||
+            ( Char ==  '|'                   )    ) continue;
+
+        tmp [i++] = Char;
+
+        if (Char != ' ') Size = i;
     }
-    
-    while (i<8) tmp[i++]=0;
+
+    i = Size;
+
+    while (i<16) tmp[i++]=0;
 }
 
 
@@ -104,7 +125,7 @@ void ffs_init(void)
     
     // Инитим флэш
     f_init();
-    f_size-=sizeof(fat);	// убираем из размера размер FAT
+    f_size-=DATA_FIRST_ADR;	// убираем из размера размер FAT
     f_size/=4096;		// сразу в секторы 4к
     f_size&=~0x07;		// чтобы размер был кратным 8
     
@@ -191,7 +212,7 @@ uint32_t ffs_image_at(void)
 
 uint32_t ffs_image_size(void)
 {
-    return f_size*4096 + sizeof(fat);
+    return f_size*4096 + DATA_FIRST_ADR;
 }
 
 
@@ -220,7 +241,7 @@ uint32_t ffs_free(void)
 
 void ffs_read(uint16_t n, uint16_t offs, uint8_t *data, uint16_t size)
 {
-    f_read(sizeof(fat) + fat[n].page*4096 + offs, data, size);
+    f_read(DATA_FIRST_ADR + fat[n].page*4096 + offs, data, size);
 }
 
 
@@ -260,7 +281,6 @@ int16_t ffs_create(const char *fname, uint8_t type, uint16_t size)
     fat[n].page=s;
     fat[n].size=size;
     fat[n].type=type;
-    fat[n].reserved=0;
     fat[n].crc8=CRC8(CRC8_INIT, (uint8_t*)&fat[n], sizeof(FILE)-1);
     
     // Записываем FAT
@@ -284,7 +304,7 @@ void ffs_writeData(uint16_t n, uint16_t offs, const uint8_t *data, uint16_t size
     while (size > 0)
     {
 	// Получаем адрес
-	uint32_t addr=sizeof(fat) + fat[n].page*4096 + offs;
+	uint32_t addr=DATA_FIRST_ADR + fat[n].page*4096 + offs;
 	
 	// Стираем страницу, если надо
 	if ((addr & 4095)==0) f_erase(addr);
@@ -318,14 +338,19 @@ bool ffs_write(const char *fname, uint8_t type, const uint8_t *data, uint16_t si
 int16_t ffs_find(const char *fname)
 {
     uint16_t n;
-    char tmp[8];
+    char tmp [16];
     
     ffs_cvt_name(fname, tmp);
     
     for (n=0; n<FAT_SIZE; n++)
     {
+	int Count;
 	if ( (fat[n].type == TYPE_REMOVED) || (fat[n].type == TYPE_FREE) ) continue;
-	if (ets_memcmp(fat[n].name, tmp, 8) == 0) return n;
+    for (Count=0; Count<16; Count++)
+    {
+	if (to_upper(fat[n].name[Count]) != to_upper(tmp[Count])) break;
+    }
+    if (Count >= 16) return n;
     }
     
     return -1;
@@ -334,7 +359,7 @@ int16_t ffs_find(const char *fname)
 
 uint32_t ffs_flash_addr(uint16_t n)
 {
-    return FFS_AT + sizeof(fat) + fat[n].page * 4096;
+    return FFS_AT + DATA_FIRST_ADR + fat[n].page * 4096;
 }
 
 
@@ -386,8 +411,15 @@ int16_t ffs_rename(uint16_t old_n, const char *fname)
 
 const char* ffs_name(uint16_t n)
 {
-    static char tmp[9];
-    ets_memcpy(tmp, fat[n].name, 8);
-    tmp[8]=0;
+    static char tmp[16+1];
+    ets_memcpy(tmp, fat[n].name, 16);
+    tmp[16]=0;
+    return tmp;
+}
+
+const char* ffs_name_utf8 (uint16_t n)
+{
+    static char tmp[16*2+1];
+    KOI8_To_UTF8(tmp, ffs_name(n));
     return tmp;
 }

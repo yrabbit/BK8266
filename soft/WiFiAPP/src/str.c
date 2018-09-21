@@ -26,6 +26,7 @@ int to_upper(int c)
 {
     if ( (c>='a') && (c<='z') )
 	return (c-'a')+'A'; else
+    if ((c >= 0xC0) && (c <= 0xDF)) return  c + 0x20; else // Русские символы КОИ8-Р
 	return c;
 }
 
@@ -34,6 +35,7 @@ int to_lower(int c)
 {
     if ( (c>='A') && (c<='Z') )
 	return (c-'A')+'a'; else
+    if ((c >= 0xE0) && (c <= 0xFF)) return  c - 0x20; else  // Русские символы КОИ8-Р
 	return c;
 }
 
