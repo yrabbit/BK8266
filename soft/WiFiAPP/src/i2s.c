@@ -224,14 +224,14 @@ void i2s_init(i2s_cb_t cb, int size)
     int i;
     for (i=0; i<N_BUFS; i++)
     {
-	i2sBufDesc[0].owner = 1;
-	i2sBufDesc[0].eof = 1;
-	i2sBufDesc[0].sub_sof = 0;
-	i2sBufDesc[0].datalen = size;	//Size (in bytes)
-	i2sBufDesc[0].blocksize = size;	//Size (in bytes)
-	i2sBufDesc[0].buf_ptr=(uint32_t)i2s_cb();
-	i2sBufDesc[0].unused=0;
-	i2sBufDesc[0].next_link_ptr=(uint32_t)&i2sBufDesc[ (i+1) & (N_BUFS-1) ];
+	i2sBufDesc[i].owner = 1;
+	i2sBufDesc[i].eof = 1;
+	i2sBufDesc[i].sub_sof = 0;
+	i2sBufDesc[i].datalen = size;	//Size (in bytes)
+	i2sBufDesc[i].blocksize = size;	//Size (in bytes)
+	i2sBufDesc[i].buf_ptr=(uint32_t)i2s_cb();
+	i2sBufDesc[i].unused=0;
+	i2sBufDesc[i].next_link_ptr=(uint32_t)&i2sBufDesc[ (i+1) & (N_BUFS-1) ];
     }
     
     
