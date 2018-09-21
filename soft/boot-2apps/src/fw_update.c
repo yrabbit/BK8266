@@ -3,6 +3,7 @@
 #include "ets.h"
 #include "crc16.h"
 #include "reboot.h"
+#include "spi_flash.h"
 
 
 struct header
@@ -65,9 +66,9 @@ void fw_update(void)
     {
 	ets_printf(" %02X", 1+i);
 	SPIRead(0x81000+i*4096, buf, 4096);
-	SPIUnlock();
+	spi_flash_unlock();
 	SPIEraseSector(0x1+i);
-	SPIUnlock();
+	spi_flash_unlock();
 	SPIWrite(0x01000+i*4096, buf, 4096);
     }
     ets_printf("\n");
@@ -82,7 +83,7 @@ void fw_update(void)
     }
     
     // Можно стирать заголовок обновления
-    SPIUnlock();
+    spi_flash_unlock();
     SPIEraseSector(0x80);
     
     // Готово

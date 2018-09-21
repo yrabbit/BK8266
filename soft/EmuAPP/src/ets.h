@@ -39,10 +39,24 @@ extern void gpio_output_set(uint32_t set_mask,
 extern uint32_t gpio_input_get(void);
 extern void gpio_pin_intr_state_set(uint32_t i, GPIO_INT_TYPE intr_state);
 
-extern uint32_t SPIRead(uint32_t addr, void *outptr, uint32_t len);
-extern uint32_t SPIEraseSector(int);
-extern uint32_t SPIWrite(uint32_t addr, const void *inptr, uint32_t len);
-extern void SPIUnlock(void);
+typedef struct
+{
+	uint32_t  deviceId;
+	uint32_t  chip_size;    // chip size in byte
+	uint32_t  block_size;
+	uint32_t  sector_size;
+	uint32_t  page_size;
+	uint32_t  status_mask;
+} SpiFlashChip;
+extern SpiFlashChip *flashchip;
+typedef int SpiFlashOpResult;
+extern SpiFlashOpResult SPI_read_status	 (SpiFlashChip *sflashchip, uint32_t *sta);
+extern SpiFlashOpResult SPI_write_status (SpiFlashChip *sflashchip, uint32_t sta);
+extern SpiFlashOpResult SPI_write_enable (SpiFlashChip *sflashchip);
+extern SpiFlashOpResult Wait_SPI_Idle	 (SpiFlashChip *sflashchip);
+extern uint32_t 		SPIRead			 (uint32_t addr, void *outptr, uint32_t len);
+extern uint32_t 		SPIEraseSector	 (int);
+extern uint32_t 		SPIWrite		 (uint32_t addr, const void *inptr, uint32_t len);
 
 extern void ets_printf(char*, ...);
 extern void ets_install_putc1(void *routine);

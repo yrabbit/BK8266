@@ -2,6 +2,7 @@
 
 #ifdef __ets__
     #include "ets.h"
+    #include "spi_flash.h"
 #else
     #include <osapi.h>
     #include <user_interface.h>
@@ -22,7 +23,7 @@ static uint32_t f_size;
     typedef unsigned int	uint32;
     #define spi_flash_read(addr, buf, size)	SPIRead(addr, buf, size)
     #define spi_flash_write(addr, buf, size)	SPIWrite(addr, buf, size)
-    #define spi_flash_erase_sector(addr)	do { SPIUnlock(); SPIEraseSector(addr); } while(0)
+    #define spi_flash_erase_sector(addr)	do { spi_flash_unlock(); SPIEraseSector(addr); } while(0)
 #else
     #define ets_printf os_printf
 #endif

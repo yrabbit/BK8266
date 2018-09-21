@@ -17,7 +17,8 @@ C_SOURCES+= \
 	src/check_image.c	\
 	src/crc16.c		\
 	src/fw_update.c		\
-	src/reboot.c
+	src/reboot.c	\
+	src/spi_flash.c \
 
 ##############################################################################
 
