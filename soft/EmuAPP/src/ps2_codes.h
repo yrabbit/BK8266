@@ -116,7 +116,7 @@
 #define PS2_KP_2	0x72
 #define PS2_KP_3	0x7A
 #define PS2_KP_4	0x6B
-#define PS2_KP_5	0x72
+#define PS2_KP_5	0x73
 #define PS2_KP_6	0x74
 #define PS2_KP_7	0x6C
 #define PS2_KP_8	0x75

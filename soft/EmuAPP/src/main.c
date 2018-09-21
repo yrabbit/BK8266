@@ -1,303 +1,194 @@
 #include "ets.h"
 
 #include "tv.h"
-#include "vg75.h"
-#include "vv55_i.h"
 #include "ps2.h"
-#include "keymap.h"
-#include "i8080.h"
-#include "i8080_hal.h"
-#include "tape.h"
+//#include "keymap.h"
+//#include "tape.h"
 #include "timer0.h"
-#include "ui.h"
-#include "menu.h"
+//#include "ui.h"
+//#include "menu.h"
 #include "ffs.h"
-#include "zkg.h"
+//#include "zkg.h"
 #include "reboot.h"
-#include "help.h"
+//#include "help.h"
 #include "str.h"
 #include "board.h"
+#include "CPU.h"
+#include "Key.h"
 
+static void TapeOp (void)
+{
+    uint_fast16_t ParamAdr = Device_Data.CPU_State.r [1];
+    uint_fast8_t  Cmd      = MEM8  [ ParamAdr          ];
+    uint_fast16_t Addr     = MEM16 [(ParamAdr + 2) >> 1];
+    uint_fast16_t Size     = MEM16 [(ParamAdr + 4) >> 1];
 
-// Отношение частоты ESP8266 к частоте эмуляции
-volatile uint8_t i8080_speed_K=90;	// 160/1.78
+    static uint32_t Buf [32];
 
+    ets_memcpy (Buf, &MEM8 [ParamAdr + 6], 16);
+
+    Buf [4] = 0;
+
+    if (Cmd == 3)
+    {
+        int  iFile = ffs_find ((char *) &Buf [0]);
+
+        if (iFile < 0)
+        {
+            Addr = 0;
+            MEM8 [ParamAdr + 1] = 2;
+        }
+        else
+        {
+            uint_fast16_t Offset;
+            // ffs_read (uint16_t n, uint16_t offs, uint8_t *data, uint16_t size)
+
+            ffs_read ((uint16_t) iFile, 0, (uint8_t *) &Buf [0], 4);
+
+            if (Addr == 0) Addr = ((uint16_t *) &Buf [0]) [0];
+            Size = ((uint16_t *) &Buf [0]) [1];
+
+            MEM8  [ParamAdr + 1] = 0;
+            MEM16 [0264 >> 1   ] = Addr;
+            MEM16 [0266 >> 1   ] = Size;
+            MEM16 [(ParamAdr + 026) >> 1] = Addr;
+            MEM16 [(ParamAdr + 030) >> 1] = Size;
+
+            Offset = 4;
+
+            while (Size)
+            {
+                ffs_read ((uint16_t) iFile, Offset, (uint8_t *) &Buf [0], sizeof (Buf));
+
+                if (Size >= sizeof (Buf)) {ets_memcpy (&MEM8 [Addr], Buf, sizeof (Buf)); Addr += sizeof (Buf); Size -= sizeof (Buf);}
+                else                      {ets_memcpy (&MEM8 [Addr], Buf,         Size); Addr += Size; break;}
+
+                Offset += sizeof (Buf);
+            }
+
+            ets_memcpy (&MEM8 [ParamAdr + 032], ffs_name ((uint16_t) iFile), 16);
+
+            {
+                int Count;
+
+                for (Count = 0; (Count < 16) && (MEM8 [ParamAdr + 032 + Count] != 0); Count++);
+                for (;          (Count < 16);                                         Count++) MEM8 [ParamAdr + 032 + Count] = ' ';
+            }
+        }
+
+        Device_Data.CPU_State.r [5] = Addr;
+        Device_Data.CPU_State.r [7] = MEM16 [Device_Data.CPU_State.r [6] >> 1];
+
+        Device_Data.CPU_State.r [6] += 2;
+    }
+}
 
 void main_program(void)
 {
+    int_fast32_t  Time;
+    uint_fast32_t T   = 0;
     // Инитим файловую систему
     ffs_init();
     
-    // Инитим процессор
-    i8080_hal_init();
-    i8080_init();
-    i8080_jump(0xF800);
-    
-    // Читаем образы ПЗУ
-    {
-        int i;
-	
-        for (i=0; i<FAT_SIZE; i++)
-        {
-            if (fat[i].type == TYPE_ROM)
-            {
-                // Образ
-                const char *name=ffs_name(i);
-                ets_printf("Loading ROM '%s'\n", name);
-                if ( (ets_strlen(name)!=4) ||
-                     (! is_xdigit(name[0])) ||
-                     (! is_xdigit(name[1])) ||
-                     (! is_xdigit(name[2])) ||
-                     (! is_xdigit(name[3])) )
-                {
-                    // Неверное имя файла
-                    ets_printf("  Bad file name\n");
-                    continue;
-                }
-		
-                // Адрес
-                int addr=parse_hex(name);
-                if ( (addr >= 0xE000) && (addr+fat[i].size <= 0x10000) )
-                {
-                    // ПЗУ
-                    // Загружаем в IRAM (можно использовать ffs_read, т.к. он работает с 4-байтными словами)
-                    ffs_read(i, 0, i8080_hal_rom()+(addr-0xE000), fat[i].size);
-                    ets_printf("  OK\n");
-                } else
-                if ( (addr < 0x8000) && (addr+fat[i].size <= 0x8000) )
-                {
-                    // ОЗУ
-                    ffs_read(i, 0, i8080_hal_memory()+addr, fat[i].size);
-                    ets_printf("  OK\n");
-                } else
-                {
-                    // Неверный адрес или размер
-                    ets_printf("  Bad address or size\n");
-                    continue;
-                }
-
-            }
-        }
-    }
-    
     // Инитим экран
-    tv_init();
-    vg75_init((uint8_t*)i8080_hal_memory());
-    tv_start();
-    
+    tv_init  ();
+    tv_start ();
     // Инитим клавиатуру
-    kbd_init();
-    ps2_init();
-    keymap_init();
+    ps2_init ();
     
-    // Инитим магнитофон
-    tape_init();
+    // Инитим процессор
+    CPU_Init ();
+
+    Time = getCycleCount ();
+
     
     // Запускаем эмуляцию
-    uint32_t prev_T=getCycleCount();
-    uint32_t sec_T=prev_T;
-    uint32_t cycles=0, sec_cycles=0;
-    bool turbo=false, win=false;
     while (1)
     {
-        uint32_t T=getCycleCount();
-        int32_t dT=T-prev_T;
-	
-        if ( (dT > 0) || (turbo) )
+        uint_fast8_t  Count;
+
+        if (Key_Flags & KEY_FLAGS_TURBO)
         {
-            // Можно запускать эмуляцию проца
-            uint8_t n=turbo ? 200 : 20;
-            while (n--)
+            for (Count = 0; Count < 16; Count++)
             {
-        	uint16_t c=i8080_instruction();
-                cycles+=c;
-                i8080_cycles+=c;
+                CPU_RunInstruction ();
+
+                if (Device_Data.CPU_State.r [7] == 0116076) TapeOp ();
             }
-	    
-            if (! turbo)
-        	prev_T+=cycles*i8080_speed_K; else
-        	prev_T=T;
-            sec_cycles+=cycles;
-            cycles=0;
+
+            Time = getCycleCount ();
+            T    = Device_Data.CPU_State.Time;
         }
-	
-        if ( ((uint32_t)(T-sec_T)) >= 160000000)
+        else
         {
-            // Прошла секунда
-            ets_printf("Speed=%d rtc=0x%08x\n", (int)sec_cycles, READ_PERI_REG(0x60001200));
-            //kbd_dump();
-            sec_cycles=0;
-            sec_T=T;
+            uint_fast32_t NewT;
+
+            for (Count = 0; Count < 16; Count++)
+            {
+                if ((int32_t) (Time - getCycleCount ()) > 0) break;
+
+                CPU_RunInstruction ();
+
+                NewT  = Device_Data.CPU_State.Time;
+                Time += (uint32_t) (NewT - T) * 53;
+                T     = NewT;
+
+                if (Device_Data.CPU_State.r [7] == 0116076) TapeOp ();
+            }
+
+            NewT = getCycleCount ();
+            if ((int32_t) (NewT - Time) > 0x10000L) Time = NewT - 0x10000L;
         }
-	
-	// Вся периодика
-	
-	if (tape_periodic())
-	{
-	    // Закончена запись на магнитофон - надо предложить сохранить файл
-	    ui_start();
-		tape_save();
-	    ui_stop();
-	    
-	    // Сбрасываем время циклов
-	    sec_T=prev_T=getCycleCount();
-	    sec_cycles=0;
-	}
-	
-	if (win)
-	{
-	    // Win нажата - обрабатываем спец-команды
-	    uint16_t c=ps2_read();
-	    switch (c)
-	    {
-		case PS2_LEFT:
-		    // Экран влево
-		    if (screen.x_offset > 0) screen.x_offset--;
-		    break;
-		    
-		case PS2_RIGHT:
-		    // Экран вправо
-		    if (screen.x_offset < 16) screen.x_offset++;
-		    break;
-		    
-		case PS2_UP:
-		    // Экран вверх
-		    if (screen.y_offset > 8) screen.y_offset-=8; else screen.y_offset=0;
-		    break;
-		    
-		case PS2_DOWN:
-		    // Экран вниз
-		    if (screen.y_offset < 8*8) screen.y_offset+=8;
-		    break;
-		    
-		case PS2_L_WIN | 0x8000:
-		case PS2_R_WIN | 0x8000:
-		    // Отжали Win
-		    win=false;
-		    break;
-	    }
-	} else
-	{
-	    // Win не нажата
-	    uint16_t c;
-	    bool rst=false;
-	    
-    	    ps2_leds(kbd_rus(), true, turbo);
-    	    ps2_periodic();
-    	    c=keymap_periodic();
-    	    switch (c)
-    	    {
-    		case 0:
-    		    break;
-    		
-    		case PS2_ESC:
-    		    // Меню
-		    ui_start();
-			menu();
-		    ui_stop();
-		    rst=true;
-		    break;
-		
-		case PS2_F5:
-		    // Переход на ПЗУ
-		    i8080_jump(0xE000);
-		    break;
-		
-		case PS2_F6:
-		    // Переход на ПЗУ
-		    i8080_jump(0xE004);
-		    break;
-		
-		case PS2_F7:
-		    // Переход на ПЗУ
-		    i8080_jump(0xE008);
-		    break;
-		
-		case PS2_F8:
-		    // Переход на ПЗУ
-		    i8080_jump(0xE00C);
-		    break;
-		
-		case PS2_F10:
-		    // Переход на ПЗУ
-		    i8080_jump(0xE010);
-		    break;
-		
-		case PS2_F9:
-		    // Переход на ПЗУ
-		    i8080_jump(0xE014);
-		    break;
-		
-		case PS2_F11:
-		    // Выход в монитор
-		    i8080_jump(0xF800);
-		    break;
-		
-		case PS2_F12:
-		    // Файловый менеджен
-		    ui_start();
-			menu_fileman();
-		    ui_stop();
-		    rst=true;
-		    break;
-		
-		case PS2_PAUSE:
-		    // Сброс
-        	    i8080_init();
-        	    i8080_hal_init();
-        	    i8080_jump(0xF800);
-        	    break;
-		
-		case PS2_PRINT:
-		    // WiFi
-		    reboot(0x55AA55AA);
-		    break;
-		
-		case PS2_SCROLL:
-		    // Переключатель турбо
-		    turbo=!turbo;
-		    break;
-		
-		case PS2_L_WIN:
-		case PS2_R_WIN:
-		    // Нажали Win
-		    win=true;
-		    break;
-		
-		case PS2_MENU:
-		    // Отобразить справку
-		    help_display();
-		    break;
-		
-		/*case PS2_F12:
-		    // Дамп экрана
-		    {
-			ets_printf("VRAM w=%d h=%d:\n", screen.screen_w, screen.screen_h);
-			int i,j;
-			uint8_t *vram=screen.vram;
-			for (i=0; i<screen.screen_h; i++)
-			{
-			    ets_printf("%2d: ", i);
-			    for (j=0; j<screen.screen_w; j++)
-			    {
-				ets_printf(" %02X", *vram++);
-			    }
-			    ets_printf("\n");
-			}
-		    }
-		    break;*/
-		
-		default:
-		    ets_printf("PS2: %04X\n", c);
-		    break;
-    	    }
-    	    
-    	    if (rst)
-    	    {
-	        // Сбрасываем время циклов
-		sec_T=prev_T=getCycleCount();
-		sec_cycles=0;
-	    }
-    	}
+
+        // Вся периодика
+
+        ps2_periodic ();
+
+        {
+            static uint16_t LastKey = 0x8000U;
+            uint_fast16_t CodeAndFlags = ps2_read ();
+
+            if (CodeAndFlags)
+            {
+                uint_fast16_t Key = Key_Translate (CodeAndFlags);
+
+                if (CodeAndFlags & 0x8000U)
+                {
+                    if (LastKey == (CodeAndFlags ^ 0x8000U)) MEM16 [0177716 >> 1] |= 0100;
+                }
+                else
+                {
+                    if (Key != KEY_UNKNOWN)
+                    {
+                        uint_fast8_t Key7 = Key & 0177;
+                        if      (Key7 == 14) Key_SetNewRusLat ();
+                        else if (Key7 == 15) Key_ClrNewRusLat ();
+
+                        LastKey = CodeAndFlags;
+
+                        MEM16 [0177716 >> 1] &= ~0100;
+
+                        if ((MEM16 [0177660 >> 1] & 0100) == 0)
+                        {
+                            if (Key & KEY_AR2_PRESSED)
+                            {
+                                Device_Data.CPU_State.Flags &= ~CPU_FLAG_KEY_VECTOR_60;
+                                Device_Data.CPU_State.Flags |=  CPU_FLAG_KEY_VECTOR_274;
+                            }
+                            else
+                            {
+                                Device_Data.CPU_State.Flags &= ~CPU_FLAG_KEY_VECTOR_274;
+                                Device_Data.CPU_State.Flags |=  CPU_FLAG_KEY_VECTOR_60;
+                            }
+                        }
+
+                        MEM16 [0177660 >> 1] |= 0200;
+                        MEM16 [0177662 >> 1]  = (uint16_t) Key7;
+                    }
+                }
+
+                ps2_leds ((Key_Flags >> KEY_FLAGS_CAPSLOCK_POS) & 1, 0 /* num */, (Key_Flags >> KEY_FLAGS_TURBO_POS) & 1);
+            }
+        }
     }
 }

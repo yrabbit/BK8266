@@ -147,7 +147,7 @@ uint16_t ps2_read(void)
     uint16_t d=rxq[rxq_tail];
     rxq_tail=(rxq_tail + 1) & (RXQ_SIZE-1);
     //ets_printf("PS2: 0x%04X\n", d);
-    led_status^=0x02;
+//  led_status^=0x02;
     return d;
 }
 

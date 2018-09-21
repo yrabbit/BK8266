@@ -3,18 +3,22 @@
 MEMORY
 {
   dport0_0_seg :                        org = 0x3FF00000, len = 0x10
-  dram0_0_seg :                         org = 0x3FFE8000, len = 0x14000
+  bkram_seg :                           org = 0x3FFE8000, len = 0x8000
+  bkrom_seg :                           org = 0x3FFF0000, len = 0x8000
+  dram0_0_seg :                         org = 0x3FFF8000, len = 0x4000
   iram1_0_seg :                         org = 0x40100000, len = 0xFC00	/* last 256b for loader */
   irom0_0_seg :                         org = 0x40240000, len = 0x3C000
 }
 
 PHDRS
 {
-  dport0_0_phdr PT_LOAD;
-  dram0_0_phdr PT_LOAD;
-  dram0_0_bss_phdr PT_LOAD;
-  iram1_0_phdr PT_LOAD;
-  irom0_0_phdr PT_LOAD;
+  dport0_0_phdr 	PT_LOAD;
+  bkram_phdr 		PT_LOAD;
+  bkrom_phdr 		PT_LOAD;
+  dram0_0_phdr 		PT_LOAD;
+  dram0_0_bss_phdr 	PT_LOAD;
+  iram1_0_phdr 		PT_LOAD;
+  irom0_0_phdr 		PT_LOAD;
 }
 
 
@@ -46,7 +50,6 @@ PROVIDE(_memmap_cacheattr_reset = _memmap_cacheattr_wb_trapnull);
 
 SECTIONS
 {
-
   .dport0.rodata : ALIGN(4)
   {
     _dport0_rodata_start = ABSOLUTE(.);
@@ -70,6 +73,20 @@ SECTIONS
     *(.dport.data)
     _dport0_data_end = ABSOLUTE(.);
   } >dport0_0_seg :dport0_0_phdr
+
+  .bkram.bss (NOLOAD) : ALIGN(4)
+  {
+    _bkram_data_start = ABSOLUTE(.);
+    *(.bkram.bss)
+    _bkram_data_end   = ABSOLUTE(.);
+  } >bkram_seg :bkram_phdr
+
+  .bkrom.data : ALIGN(4)
+  {
+    _bkrom_data_start = ABSOLUTE(.);
+    *(.bkrom.data)
+    _bkrom_data_end   = ABSOLUTE(.);
+  } >bkrom_seg :bkrom_phdr
 
   .data : ALIGN(4)
   {

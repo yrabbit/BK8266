@@ -3,8 +3,11 @@
 soft/boot-2apps/out/boot*
 soft/EmuAPP/out/emu*
 soft/WiFiAPP/out/wifi*
-soft/WiFiAPP/httpfs/mkfs
+soft/WiFiAPP/httpfs/mkfs.exe
 soft/WiFiAPP/httpfs/httpfs.bin
+soft/help/mkhelp.exe
+soft/mkfw/mkfw.exe
+soft/mkfw/*.bin
 out/project.1.*
 _old
 

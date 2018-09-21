@@ -13,20 +13,22 @@
 ##############################################################################
 
 C_SOURCES+= \
-	src/startup.c		src/timer0.c		\
-	src/i2s.c		src/gpio_lib.c		\
-	src/tv.c		src/vg75.c		\
-	src/zkg.c		src/xlat.c		\
-	src/vv55_i.c		src/i8080_hal.c		\
-	src/i8080.c		src/main.c		\
-	src/ps2.c		src/ps2_codes.c		\
-	src/keymap.c		\
-	src/ui.c		src/menu.c		\
-	src/xprintf.c		src/str.c		\
-	src/tape.c		src/reboot.c		\
-	src/crc8.c		src/ffs.c		\
-	src/files.c		src/align4.c		\
-	src/fileman.c		src/help.c
+	src/startup.c	\
+	src/timer0.c	\
+	src/i2s.c		\
+	src/gpio_lib.c	\
+	src/tv.c		\
+	src/main.c		\
+	src/ps2.c		\
+	src/xprintf.c	\
+	src/str.c		\
+	src/reboot.c	\
+	src/crc8.c		\
+	src/ffs.c		\
+	src/align4.c	\
+	src/CPU.c		\
+	src/Key.c		\
+
 
 ##############################################################################
 

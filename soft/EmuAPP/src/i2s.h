@@ -10,7 +10,7 @@ extern "C" {
 #endif
 
 
-typedef const uint8_t* (*i2s_cb_t)(void);
+typedef const uint32_t* (*i2s_cb_t)(void);
 
 
 void i2s_init(i2s_cb_t cb, int size);

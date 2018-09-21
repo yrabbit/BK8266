@@ -2,8 +2,11 @@
 #define LIBESP_STR_H
 
 
-#include <os_type.h>
-
+#ifdef __ets__
+    #include "ets.h"
+#else
+	#include <os_type.h>
+#endif
 
 #ifdef __cplusplus
 extern "C" {
