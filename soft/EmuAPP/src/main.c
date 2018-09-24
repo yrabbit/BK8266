@@ -152,6 +152,8 @@ void main_program(void)
             {
                 uint_fast16_t Key = Key_Translate (CodeAndFlags);
 
+                MEM16 [0177714 >> 1] = (uint16_t) (Key_Flags >> KEY_FLAGS_UP_POS);
+
                 if (CodeAndFlags & 0x8000U)
                 {
                     if (LastKey == (CodeAndFlags ^ 0x8000U)) MEM16 [0177716 >> 1] |= 0100;
@@ -187,7 +189,7 @@ void main_program(void)
                     }
                 }
 
-                ps2_leds ((Key_Flags >> KEY_FLAGS_CAPSLOCK_POS) & 1, 0 /* num */, (Key_Flags >> KEY_FLAGS_TURBO_POS) & 1);
+                ps2_leds ((Key_Flags >> KEY_FLAGS_CAPSLOCK_POS) & 1, (Key_Flags >> KEY_FLAGS_NUMLOCK_POS) & 1, (Key_Flags >> KEY_FLAGS_TURBO_POS) & 1);
             }
         }
     }

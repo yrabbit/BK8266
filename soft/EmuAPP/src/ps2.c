@@ -143,11 +143,14 @@ void ps2_init(void)
 
 uint16_t ps2_read(void)
 {
+	static uint16_t PrevCode;
     if (rxq_head == rxq_tail) return 0;
     uint16_t d=rxq[rxq_tail];
     rxq_tail=(rxq_tail + 1) & (RXQ_SIZE-1);
+    if ((PrevCode & 0x3FF) == 0x214 && (d & 0x3FF) == 0x77) d = 0;
     //ets_printf("PS2: 0x%04X\n", d);
 //  led_status^=0x02;
+	PrevCode = d;
     return d;
 }
 
@@ -177,6 +180,32 @@ static PT_THREAD(task(struct pt *pt))
     
 #warning TODO: надо сделать буфер для передачи в клавиатуру и обрабатывать resend итд
     PT_BEGIN(pt);
+
+resend3:
+    // PS2_CLK вниз
+    gpio_off(PS2_CLK);
+    gpio_init_output(PS2_CLK);
+    PT_SLEEP(100);
+    
+    // PS2_DATA вниз (старт бит)
+    gpio_off(PS2_DATA);
+    gpio_init_output(PS2_DATA);
+    PT_SLEEP(200);
+    
+    // Отправляем команду "Reset"
+    ack=0;
+    resend=0;
+    start_tx(0xFF);
+    
+    // Отпускаем PS2_CLK
+    gpio_init_input_pu(PS2_CLK);
+    
+    // Ждем немного
+    PT_SLEEP(5000);
+    
+    // Проверим подтверждение
+    if (resend) goto resend3;
+
 	while (1)
 	{
 	    if ( (last_led == led_status) && (! bat) )

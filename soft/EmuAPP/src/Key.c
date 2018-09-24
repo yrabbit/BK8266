@@ -41,6 +41,14 @@ static const uint8_t Key_ShiftTab [32][2] =
     { ' ',  ' '},   // 0x9F
 };
 
+static const uint8_t Key_ASDF_RusLatTab [4][2] =
+{
+    {                 'A',                  'F'},       // PS2_A           0x1C    A       ж    F
+    {                 'S',                  'Y'},       // PS2_S           0x1B    S       щ    Y
+    {                 'D',                  'W'},       // PS2_D           0x23    D       ч    W
+    {                 'F',                  'A'},       // PS2_F           0x2B    F       б    A
+};
+
 static const uint8_t Key_RusLatTab [0x84] [2] =
 {
                                                         // Key Name      Key Code  Lat     Rus
@@ -71,23 +79,23 @@ static const uint8_t Key_RusLatTab [0x84] [2] =
     {         KEY_UNKNOWN,          KEY_UNKNOWN},       //                 0x18
     {         KEY_UNKNOWN,          KEY_UNKNOWN},       //                 0x19
     {                 'Z',                  'Q'},       // PS2_Z           0x1A    Z       с    Q
-    {                 'S',                  'Y'},       // PS2_S           0x1B    S       щ    Y
-    {                 'A',                  'F'},       // PS2_A           0x1C    A       ж    F
+    {               KEY_S,                KEY_S},       // PS2_S           0x1B    S       щ    Y
+    {               KEY_A,                KEY_A},       // PS2_A           0x1C    A       ж    F
     {                 'W',                  'C'},       // PS2_W           0x1D    W       г    C
     {                0x83,                 0x84},       // PS2_2           0x1E    2@      2"
     {         KEY_UNKNOWN,          KEY_UNKNOWN},       //                 0x1F
     {         KEY_UNKNOWN,          KEY_UNKNOWN},       //                 0x20
     {                 'C',                  'S'},       // PS2_C           0x21    C       у    S
     {                 'X',                  '^'},       // PS2_X           0x22    X       ю    ^
-    {                 'D',                  'W'},       // PS2_D           0x23    D       ч    W
+    {               KEY_D,                KEY_D},       // PS2_D           0x23    D       ч    W
     {                 'E',                  'U'},       // PS2_E           0x24    E       х    U
     {                0x85,                 0x86},       // PS2_4           0x25    4$      4;
     {                0x87,                 0x87},       // PS2_3           0x26    3#      3#
     {         KEY_UNKNOWN,          KEY_UNKNOWN},       //                 0x27
     {         KEY_UNKNOWN,          KEY_UNKNOWN},       //                 0x28
-    {                  32,                   32},       // PS2_SPACE       0x29
+    {           KEY_SPACE,            KEY_SPACE},       // PS2_SPACE       0x29
     {                 'V',                  'M'},       // PS2_V           0x2A    V       н    M
-    {                 'F',                  'A'},       // PS2_F           0x2B    F       б    A
+    {               KEY_F,                KEY_F},       // PS2_F           0x2B    F       б    A
     {                 'T',                  'E'},       // PS2_T           0x2C    T       е    E
     {                 'R',                  'K'},       // PS2_R           0x2D    R       л    K
     {                0x88,                 0x88},       // PS2_5           0x2E    5%      5%
@@ -163,7 +171,7 @@ static const uint8_t Key_RusLatTab [0x84] [2] =
     {         KEY_UNKNOWN,          KEY_UNKNOWN},       // PS2_KP_6        0x74
     {         KEY_UNKNOWN,          KEY_UNKNOWN},       // PS2_KP_8        0x75
     {         KEY_UNKNOWN,          KEY_UNKNOWN},       // PS2_ESC         0x76
-    {         KEY_UNKNOWN,          KEY_UNKNOWN},       // PS2_NUMLOCK     0x77
+    {         KEY_NUMLOCK,          KEY_NUMLOCK},       // PS2_NUMLOCK     0x77
     {         KEY_UNKNOWN,          KEY_UNKNOWN},       // PS2_F11         0x78
     {         KEY_UNKNOWN,          KEY_UNKNOWN},       // PS2_KP_PLUS     0x79
     {         KEY_UNKNOWN,          KEY_UNKNOWN},       // PS2_KP_3        0x7A
@@ -178,13 +186,28 @@ static const uint8_t Key_RusLatTab [0x84] [2] =
     {           0xA0 +  4,            0xA0 +  4},       // PS2_F7          0x83    вмпл тед (4)
 };
 
-uint16_t Key_Flags;
+uint32_t Key_Flags;
+
+static uint_fast16_t ReturnKeyCode (uint_fast8_t Key, uint_fast32_t KeyFlags)
+{
+    if (Key >= 0100 && Key <= 0137 && (KeyFlags & (KEY_FLAGS_LCTRL | KEY_FLAGS_RCTRL))) Key &= ~0140;
+    if (KeyFlags & (KEY_FLAGS_LALT | KEY_FLAGS_RALT)) Key |= KEY_AR2_PRESSED;
+
+    return Key;
+}
+
+static uint_fast16_t ReturnShiftedKeyCode (uint_fast8_t Key, uint_fast32_t KeyFlags)
+{
+    if ((((KeyFlags >> KEY_FLAGS_LSHIFT_POS) | (KeyFlags >> KEY_FLAGS_RSHIFT_POS)) ^ (KeyFlags >> KEY_FLAGS_CAPSLOCK_POS)) & 1) Key += 32;
+
+    return ReturnKeyCode (Key, KeyFlags);
+}
 
 uint_fast16_t Key_Translate (uint_fast16_t CodeAndFlags)
 {
     uint_fast16_t Key;
     uint_fast8_t  Code;
-    uint_fast16_t KeyFlags = Key_Flags;
+    uint_fast32_t KeyFlags = Key_Flags;
 
     Code = CodeAndFlags & 0x3FF;
 
@@ -192,24 +215,10 @@ uint_fast16_t Key_Translate (uint_fast16_t CodeAndFlags)
     {
         Key = Key_RusLatTab [Code] [(KeyFlags >> KEY_FLAGS_RUSLAT_POS) & 1];
 
-        if (Key <=   32) goto ReturnKeyCode;
-
-        if (Key <  0x80)
-        {
-            if ((((KeyFlags >> KEY_FLAGS_LSHIFT_POS) | (KeyFlags >> KEY_FLAGS_RSHIFT_POS)) ^ (KeyFlags >> KEY_FLAGS_CAPSLOCK_POS)) & 1) Key += 32;
-            goto ReturnKeyCode;
-        }
-
-        if (Key <= 0x9F)
-        {
-            Key = Key_ShiftTab [Key - 0x80] [((KeyFlags >> KEY_FLAGS_LSHIFT_POS) | (KeyFlags >> KEY_FLAGS_RSHIFT_POS)) & 1];
-            goto ReturnKeyCode;
-        }
-
-        if (Key < 0xC0)
-        {
-            return ((Key - 0xA0) | KEY_AR2_PRESSED);
-        }
+        if (Key <=   32) return ReturnKeyCode        ((uint_fast8_t) Key, KeyFlags);
+        if (Key <  0x80) return ReturnShiftedKeyCode ((uint_fast8_t) Key, KeyFlags);
+        if (Key <= 0x9F) return ReturnKeyCode        (Key_ShiftTab [Key - 0x80] [((KeyFlags >> KEY_FLAGS_LSHIFT_POS) | (KeyFlags >> KEY_FLAGS_RSHIFT_POS)   ) & 1], KeyFlags);
+        if (Key <  0xC0) return ((Key - 0xA0) | KEY_AR2_PRESSED);
 
         switch (Key)
         {
@@ -238,6 +247,23 @@ uint_fast16_t Key_Translate (uint_fast16_t CodeAndFlags)
 
             case KEY_SCROLL:    if ((CodeAndFlags & 0x8000U) == 0) Key_Flags = KeyFlags ^ KEY_FLAGS_TURBO;
                                 return KEY_UNKNOWN;
+
+            case KEY_NUMLOCK:   if ((CodeAndFlags & 0x8000U) == 0) Key_Flags = KeyFlags ^ KEY_FLAGS_NUMLOCK;
+                                return KEY_UNKNOWN;
+
+            case KEY_SPACE:     if (CodeAndFlags & 0x8000U) KeyFlags &= ~KEY_FLAGS_BTN1;
+                                else                        KeyFlags |=  KEY_FLAGS_BTN1;
+                                Key_Flags = KeyFlags;
+                                if (KeyFlags & KEY_FLAGS_NUMLOCK) return KEY_UNKNOWN;
+                                return ReturnKeyCode (32, KeyFlags);
+            case KEY_A:
+            case KEY_S:
+            case KEY_D:
+            case KEY_F:         if (CodeAndFlags & 0x8000U) KeyFlags &= ~(KEY_FLAGS_BTN2 << (Key - KEY_A));
+                                else                        KeyFlags |=  (KEY_FLAGS_BTN2 << (Key - KEY_A));
+                                Key_Flags = KeyFlags;
+                                if (KeyFlags & KEY_FLAGS_NUMLOCK) return KEY_UNKNOWN;
+                                return ReturnShiftedKeyCode (Key_ASDF_RusLatTab [Key - KEY_A] [(KeyFlags >> KEY_FLAGS_RUSLAT_POS) & 1], KeyFlags);
         }
 
         return KEY_UNKNOWN;
@@ -258,19 +284,40 @@ uint_fast16_t Key_Translate (uint_fast16_t CodeAndFlags)
                             Key_Flags = KeyFlags;
                             return KEY_UNKNOWN;
 
-        case PS2_L_WIN:     Key = 14; goto ReturnKeyCode;
-        case PS2_R_WIN:     Key = 15; goto ReturnKeyCode;
+        case PS2_L_WIN:     return ReturnKeyCode (14, KeyFlags);
+        case PS2_R_WIN:     return ReturnKeyCode (15, KeyFlags);
 //      case PS2_MENU:
 //      case PS2_KP_SLASH:
 //      case PS2_KP_ENTER:
 //      case PS2_END:
-        case PS2_LEFT:      Key = 8;  goto ReturnKeyCode;
+
+        case PS2_LEFT:      if (CodeAndFlags & 0x8000U) KeyFlags &= ~KEY_FLAGS_LEFT;
+                            else                        KeyFlags |=  KEY_FLAGS_LEFT;
+						    Key_Flags = KeyFlags;
+						    if (KeyFlags & KEY_FLAGS_NUMLOCK) return KEY_UNKNOWN;
+                            return ReturnKeyCode (8, KeyFlags);
+
 //      case PS2_HOME:
 //      case PS2_INSERT:
 //      case PS2_DELETE:
-        case PS2_DOWN:      Key = 27; goto ReturnKeyCode;
-        case PS2_RIGHT:     Key = 25; goto ReturnKeyCode;
-        case PS2_UP:        Key = 26; goto ReturnKeyCode;
+        case PS2_DOWN:      if (CodeAndFlags & 0x8000U) KeyFlags &= ~KEY_FLAGS_DOWN;
+                            else                        KeyFlags |=  KEY_FLAGS_DOWN;
+						    Key_Flags = KeyFlags;
+						    if (KeyFlags & KEY_FLAGS_NUMLOCK) return KEY_UNKNOWN;
+                            return ReturnKeyCode (27, KeyFlags);
+
+        case PS2_RIGHT:     if (CodeAndFlags & 0x8000U) KeyFlags &= ~KEY_FLAGS_RIGHT;
+                            else                        KeyFlags |=  KEY_FLAGS_RIGHT;
+						    Key_Flags = KeyFlags;
+						    if (KeyFlags & KEY_FLAGS_NUMLOCK) return KEY_UNKNOWN;
+                            return ReturnKeyCode (25, KeyFlags);
+
+        case PS2_UP:        if (CodeAndFlags & 0x8000U) KeyFlags &= ~KEY_FLAGS_UP;
+                            else                        KeyFlags |=  KEY_FLAGS_UP;
+						    Key_Flags = KeyFlags;
+						    if (KeyFlags & KEY_FLAGS_NUMLOCK) return KEY_UNKNOWN;
+                            return ReturnKeyCode (26, KeyFlags);
+
 //      case PS2_PGDN:
 //      case PS2_PGUP:
         case PS2_PAUSE:     if ((CodeAndFlags & 0x8000U) == 0) CPU_Stop ();
@@ -278,10 +325,4 @@ uint_fast16_t Key_Translate (uint_fast16_t CodeAndFlags)
     }
 
     return KEY_UNKNOWN;
-
-ReturnKeyCode:
-
-    if (Key >= 0100 && Key <= 0137 && (KeyFlags & (KEY_FLAGS_LCTRL | KEY_FLAGS_RCTRL))) Key &= ~0140;
-    if (KeyFlags & (KEY_FLAGS_LALT | KEY_FLAGS_RALT)) Key |= KEY_AR2_PRESSED;
-    return Key;
 }

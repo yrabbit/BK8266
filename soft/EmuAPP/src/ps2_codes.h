@@ -124,7 +124,7 @@
 
 // Special
 #define PS2_PAUSE	0x214
-#define PS2_PRINT	0x112
+#define PS2_PRINT	0x17C
 
 
 // Keyboard symbols

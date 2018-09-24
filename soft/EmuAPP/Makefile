@@ -60,7 +60,7 @@ BUILD_NUMBER=$(shell git rev-list --count HEAD)
 
 CC="$(GCCESP8266PATH)\xtensa-lx106-elf-gcc.exe"
 INCLUDES=-I$(SRCDIR)
-CFLAGS=-O3 -Wall -Wl,-EL -fno-inline-functions -nostdlib -mlongcalls -mtext-section-literals -D__ets__ $(INCLUDES)
+CFLAGS=-O3 -g -Wall -Wl,-EL -fno-inline-functions -nostdlib -mlongcalls -mtext-section-literals -D__ets__ $(INCLUDES)
 LIBS=-lgcc
 LD_SCRIPT=ld/eagle.app.v6.ld
 LDFLAGS_BUILD_NUMBER=-Xlinker --defsym -Xlinker __BUILD_NUMBER__=$(BUILD_NUMBER)
