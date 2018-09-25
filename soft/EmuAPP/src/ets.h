@@ -161,5 +161,14 @@ extern void software_reset(int param);
 #define GPIO_STATUS_W1TC_ADDRESS	0x24
 #define ETS_GPIO_INUM			4
 
+#define GPIO_SIGMA_DELTA_ADDRESS	(PERIPHS_GPIO_BASEADDR + 0x68)  //defined in gpio register.xls
+#define SIGMA_DELTA_ENABLE          (1<<16)
+#define SIGMA_DELTA_ENABLE_S        16
+#define SIGMA_DELTA_PRESCALAR       0x000000ff
+#define SIGMA_DELTA_PRESCALAR_S     8
+#define SIGMA_DELTA_TARGET          0x000000ff
+#define SIGMA_DELTA_TARGET_S        0
+#define SIGMA_DELTA_SETTING_MASK	0x00000001ff
+
 
 #endif
