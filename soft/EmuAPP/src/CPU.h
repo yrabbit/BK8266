@@ -27,6 +27,14 @@ typedef struct
 
     struct
     {
+	    uint32_t PrevT;
+    	uint8_t  T;
+	    uint8_t  Div;
+
+	} Timer;
+
+    struct
+    {
         uint16_t WrReg177714;
         uint16_t WrReg177716;
 
@@ -39,6 +47,7 @@ extern TDevice_Data Device_Data;
 void CPU_Init           (void);
 void CPU_RunInstruction (void);
 void CPU_Stop           (void);
+void CPU_TimerRun       (void);
 
 #define MEM8  ((uint8_t  *) 0x3FFE8000)
 #define MEM16 ((uint16_t *) 0x3FFE8000)

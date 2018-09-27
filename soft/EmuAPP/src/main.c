@@ -142,6 +142,8 @@ void main_program(void)
 
         // Вся периодика
 
+		CPU_TimerRun ();
+
         ps2_periodic ();
 
         {

@@ -18,6 +18,7 @@ uint16_t __attribute__((section(".bkrom.data"))) bkrom [0100000 >> 1] =
 #define  CPU_ARG_FAULT      0x80000000UL
 #define  CPU_ARG_WRITE_OK   0
 #define  CPU_ARG_WRITE_ERR  CPU_ARG_FAULT
+#define  CPU_ARG_READ_ERR   CPU_ARG_FAULT
 
 #define  CPU_IS_ARG_FAULT(        Arg) (Arg &  CPU_ARG_FAULT)
 #define  CPU_IS_ARG_REG(          Arg) (Arg &  CPU_ARG_REG)
@@ -97,23 +98,141 @@ const uint8_t CPU_timing_TwoOps_BIS [64] =
 #define CPU_CALC_TIMING_D(  Tab) {Device_Data.CPU_State.Time += Tab [(OpCode >> 3) & 07];}
 #define CPU_CALC_TIMING_SD( Tab) {Device_Data.CPU_State.Time += Tab [((OpCode >> 6) & 070) | ((OpCode >> 3) & 07)];}
 
+/*
+таймер
+
+177706 -- Регистр начального значения таймера. Доступен по чтению и записи.
+177710 -- Реверсивный счётчик. Доступен по чтению, запись в регистр игнорируется.
+177712 -- Программируемый таймер-- регистр управления.
+(001)бит 0: STOP: "1" - остановка
+При установке запрещает счёт и переписывает в регистр счётчика константу из регистра начального значения таймера
+(002)бит 1: WRAPAROUND: "1" - Режим непрерывного счёта, отменяет действие битов EXPENABLE и ONESHOT
+Запрещает фиксацию перехода счётчика через 0. Досчитав до нуля, таймер продолжает вычитание.
+(004)бит 2: EXPENABLE: "1" - разрешение установки сигнала EXPIRY ("конец счета")
+Установка включает индикацию, при очередном переходе таймера через 0 устанавливается в 1 бит EXPIRY, если ранее он был сброшен.
+Нужно учитывать, что при первом (после включения ЭВМ или системного сброса) запуске таймера в данном режиме индикация
+срабатывает только после ВТОРОГО перехода счётчика через 0, причём независимо от того, работал ли таймер до этого в
+других режимах
+(010)бит 3: ONESHOT: режим одновибратора
+При установке запрещает повторный счёт, после первого досчёта до 0 сбрасывается бит RUN. Установка данного режима не отменяет
+режим индикации (бит EXPENABLE)
+(020)бит 4: RUN: запуск счётчика, запись "1"-- загружает счётчик из регистра 177706 и начинает отсчёт
+В этом режиме при досчёте до нуля в счётчик заново заносится константа из регистра начального значения, следовательно
+счёт всегда ведётся от константы до нуля (если только не запрещена фиксация перехода через 0 битом WRAPAROUND). При сбросе
+в 0 в счётчик переписывается начальное значение из регистра начального значения
+(040)бит 5: делитель на 4, "1"-- включён
+Установка снижает скорость счёта в 4 раза (режим умножения времени на 4)
+(100)бит 6: делитель на 16, "1"-- включён
+Установка снижает скорость счёта в 16 раз (режим умножения времени на 16)
+при одновременной установке скорость снижается, соответственно в 64 раза
+(200)бит 7: EXPIRY: флаг окончания счета, устанавливается в "1" при достижении счётчиком нуля, сбрасывается только программно
+биты 8-15 не используются, "1".
+*/
+
+void CPU_TimerRun (void)
+{
+	uint_fast16_t Cfg = MEM16 [0177712 >> 1];
+
+	//если счётчик остановлен
+	if (Cfg & 1)
+	{
+		MEM16 [0177710 >> 1] = MEM16 [0177706 >> 1]; //проинициализируем регистр счётчика
+	}
+	else if (Cfg & 020) //если счётчик запущен
+	{
+    	uint_fast32_t CurT = Device_Data.CPU_State.Time >> 7;
+    	uint_fast32_t T    = Device_Data.Timer.T + (((CurT - Device_Data.Timer.PrevT) & 0xFFFFFF) << Device_Data.Timer.Div);
+		int_fast32_t  Cntr = MEM16 [0177710 >> 1];
+
+		Device_Data.Timer.PrevT = CurT;
+		Device_Data.Timer.T  = T & 0x3F;
+
+		T >>= 6;
+
+		if (Cntr == 0 || (Cfg & 2)) //если счетчик уже был равен 0 или режим WRAPAROUND
+		{
+			Cntr -= T;
+		}
+		else
+		{
+			Cntr -= T;
+
+			if (Cntr <= 0)
+			{
+				uint_fast16_t InitVal = MEM16 [0177706 >> 1];
+
+				if (Cfg & 4) //разрешение установки сигнала "конец счёта" ?
+				{
+					Cfg |= 0200;    //да, установим сигнал
+				}
+
+				if (Cfg & 010) //установлен режим одновибратора?
+				{
+					Cfg &= ~020;    //тогда сбросим бит 4
+
+					Cntr = InitVal; //проинициализируем регистр счётчика
+				}
+				else if (InitVal)
+				{
+					do
+					{
+						Cntr += InitVal; //проинициализируем регистр счётчика
+
+					} while (Cntr <= 0);
+				}
+
+				MEM16 [0177712 >> 1] = Cfg;
+			}
+		}
+
+		MEM16 [0177710 >> 1] = (uint16_t) Cntr;
+	}
+}
 
 static TCPU_Arg CPU_ReadW (TCPU_Arg Adr)
 {
     if (CPU_IS_ARG_REG (Adr)) return R [CPU_GET_ARG_REG_INDEX (Adr)];
 
-    if ((Adr & 0177776) == 0177662) MEM16 [0177660 >> 1] &= ~0200;
+	if (Adr < 0177600) return MEM16 [Adr >> 1];
 
-    return MEM16 [Adr >> 1];
+	switch (Adr >> 1)
+	{
+		case ((0177660) >> 1): break;
+		case ((0177662) >> 1): MEM16 [0177660 >> 1] &= ~0200; break;
+		case ((0177664) >> 1): break;
+		case ((0177706) >> 1): break;
+		case ((0177710) >> 1): CPU_TimerRun (); break;
+		case ((0177712) >> 1): break;
+		case ((0177714) >> 1): break;
+		case ((0177716) >> 1): break;
+
+		default: return CPU_ARG_READ_ERR;
+	}
+
+	return MEM16 [Adr >> 1];
 }
 
 static TCPU_Arg CPU_ReadB (TCPU_Arg Adr)
 {
     if (CPU_IS_ARG_REG (Adr)) return (*(uint8_t *) &R [CPU_GET_ARG_REG_INDEX (Adr)]);
 
-    if ((Adr & 0177776) == 0177662) MEM16 [0177660 >> 1] &= ~0200;
+	if (Adr < 0177600) return MEM8 [Adr];
 
-    return MEM8 [Adr];
+	switch (Adr >> 1)
+	{
+		case (0177660 >> 1): break;
+		case (0177662 >> 1): MEM16 [0177660 >> 1] &= ~0200; break;
+		case (0177664 >> 1): break;
+		case (0177706 >> 1): break;
+		case (0177710 >> 1): CPU_TimerRun (); break;
+		case (0177712 >> 1): break;
+		case (0177714 >> 1): break;
+		case (0177716 >> 1): break;
+
+		default: return CPU_ARG_READ_ERR;
+	}
+
+	return MEM8 [Adr];
 }
 
 static TCPU_Arg CPU_ReadMemW (TCPU_Arg Adr)
@@ -139,9 +258,9 @@ static TCPU_Arg CPU_WriteW (TCPU_Arg Adr, uint_fast16_t Word)
         return CPU_ARG_WRITE_OK;
     }
 
-    switch (Adr)
+    switch (Adr >> 1)
     {
-        case 0177660:
+        case (0177660 >> 1):
 
             PrevWord = MEM16 [Adr >> 1];
 
@@ -149,9 +268,9 @@ static TCPU_Arg CPU_WriteW (TCPU_Arg Adr, uint_fast16_t Word)
 
             break;
 
-//      case 0177662:
+//      case (0177662 >> 1):
             
-        case 0177664:
+        case (0177664 >> 1):
 
             PrevWord = MEM16 [Adr >> 1];
 
@@ -161,11 +280,23 @@ static TCPU_Arg CPU_WriteW (TCPU_Arg Adr, uint_fast16_t Word)
 
             break;
 
-//      case 0177706:
-//      case 0177710:
-//      case 0177712:
+        case (0177706 >> 1):
 
-        case 0177714:
+        	CPU_TimerRun ();
+            MEM16 [Adr >> 1] = (uint16_t) Word;
+            break;
+
+//      case (0177710 >> 1):
+        case (0177712 >> 1):
+
+        	Word |= 0xFF00U;
+            MEM16 [Adr >> 1]        = (uint16_t) Word;
+            Device_Data.Timer.PrevT = Device_Data.CPU_State.Time >> 7;
+            Device_Data.Timer.T     = 0;
+            Device_Data.Timer.Div	= (~Word >> 4) & 6;
+            break;
+
+        case (0177714 >> 1):
 
             Device_Data.SysRegs.WrReg177714 = (uint16_t) Word;
 
@@ -179,7 +310,7 @@ static TCPU_Arg CPU_WriteW (TCPU_Arg Adr, uint_fast16_t Word)
 
             break;
 
-        case 0177716:
+        case (0177716 >> 1):
 
             Device_Data.SysRegs.WrReg177716 = (uint16_t) Word;
 
@@ -205,6 +336,9 @@ static TCPU_Arg CPU_WriteW (TCPU_Arg Adr, uint_fast16_t Word)
 
 static uint_fast8_t CPU_WriteB (TCPU_Arg Adr, uint_fast8_t Byte)
 {
+	uint_fast16_t Word;
+    uint_fast16_t PrevWord;
+
     if (CPU_IS_ARG_REG (Adr))
     {
         *(uint8_t *) &R [CPU_GET_ARG_REG_INDEX (Adr)] = (uint8_t) Byte;
@@ -219,7 +353,82 @@ static uint_fast8_t CPU_WriteB (TCPU_Arg Adr, uint_fast8_t Byte)
         return CPU_ARG_WRITE_OK;
     }
 
-    return CPU_ARG_WRITE_ERR;
+	Word = Byte;
+
+	if (Adr & 1) Word <<= 8;
+
+    switch (Adr >> 1)
+    {
+        case (0177660 >> 1):
+
+            PrevWord = MEM16 [Adr >> 1];
+
+            MEM16 [Adr >> 1] = (uint16_t) ((Word & 0100) | (PrevWord & ~0100));
+
+            break;
+
+//      case (0177662 >> 1):
+            
+        case (0177664 >> 1):
+
+            PrevWord = MEM16 [Adr >> 1];
+
+            Word = ((Word & 01377) | (PrevWord & ~01377));
+
+            MEM16 [Adr >> 1] = (uint16_t) Word;
+
+            break;
+
+        case (0177706 >> 1):
+
+        	CPU_TimerRun ();
+            MEM16 [Adr >> 1] = (uint16_t) Word;
+            break;
+
+//      case (0177710 >> 1):
+        case (0177712 >> 1):
+
+        	Word |= 0xFF00U;
+            MEM16 [Adr >> 1]        = (uint16_t) Word;
+            Device_Data.Timer.PrevT = Device_Data.CPU_State.Time >> 7;
+            Device_Data.Timer.T     = 0;
+            Device_Data.Timer.Div	= (~Word >> 4) & 6;
+            break;
+
+        case (0177714 >> 1):
+
+            Device_Data.SysRegs.WrReg177714 = (uint16_t) Word;
+
+            {
+            	uint_fast32_t Reg = (Word & 0xFF) >> 1;
+            	if (Device_Data.SysRegs.WrReg177716 & 0100) Reg += 0x80;
+				WRITE_PERI_REG (GPIO_SIGMA_DELTA_ADDRESS,   SIGMA_DELTA_ENABLE
+														  | (Reg << SIGMA_DELTA_TARGET_S)
+														  | (1 << SIGMA_DELTA_PRESCALAR_S));
+			}
+
+            break;
+
+        case (0177716 >> 1):
+
+            Device_Data.SysRegs.WrReg177716 = (uint16_t) Word;
+
+            {
+            	uint_fast32_t Reg = *(uint8_t *) &Device_Data.SysRegs.WrReg177714 >> 1;
+            	if (Word & 0100) Reg += 0x80;
+				WRITE_PERI_REG (GPIO_SIGMA_DELTA_ADDRESS,   SIGMA_DELTA_ENABLE
+														  | (Reg << SIGMA_DELTA_TARGET_S)
+														  | (1 << SIGMA_DELTA_PRESCALAR_S));
+			}
+
+            break;
+
+        default:
+
+            return CPU_ARG_WRITE_ERR;
+    }
+
+    return CPU_ARG_WRITE_OK;
 }
 
 static TCPU_Arg CPU_GetArgAdrW (uint_fast8_t SrcCode)
@@ -1653,9 +1862,9 @@ void CPU_Reset (void)
 //  MEM16 [0177660 >> 1] = 0;
 //  MEM16 [0177662 >> 1] = 0;
     MEM16 [0177664 >> 1] = 01330;
-//  MEM16 [0177706 >> 1] = 0;
-//  MEM16 [0177710 >> 1] = 0;
-//  MEM16 [0177712 >> 1] = 0;
+//	MEM16 [0177706 >> 1] = 0;
+//	MEM16 [0177710 >> 1] = 0177777;
+//	MEM16 [0177712 >> 1] = 0177400;
 //  MEM16 [0177714 >> 1] = 0;
     MEM16 [0177716 >> 1] = (0100000 & 0177400) | 0300;
 
