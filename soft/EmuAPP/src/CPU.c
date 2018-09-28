@@ -197,14 +197,14 @@ static TCPU_Arg CPU_ReadW (TCPU_Arg Adr)
 
 	switch (Adr >> 1)
 	{
-		case ((0177660) >> 1): break;
-		case ((0177662) >> 1): MEM16 [0177660 >> 1] &= ~0200; break;
-		case ((0177664) >> 1): break;
-		case ((0177706) >> 1): break;
-		case ((0177710) >> 1): CPU_TimerRun (); break;
-		case ((0177712) >> 1): break;
-		case ((0177714) >> 1): break;
-		case ((0177716) >> 1): break;
+		case (0177660 >> 1): break;
+		case (0177662 >> 1): MEM16 [0177660 >> 1] &= ~0200; break;
+		case (0177664 >> 1): break;
+		case (0177706 >> 1): break;
+		case (0177710 >> 1): CPU_TimerRun (); break;
+		case (0177712 >> 1): CPU_TimerRun (); break;
+		case (0177714 >> 1): break;
+		case (0177716 >> 1): break;
 
 		default: return CPU_ARG_READ_ERR;
 	}
@@ -225,7 +225,7 @@ static TCPU_Arg CPU_ReadB (TCPU_Arg Adr)
 		case (0177664 >> 1): break;
 		case (0177706 >> 1): break;
 		case (0177710 >> 1): CPU_TimerRun (); break;
-		case (0177712 >> 1): break;
+		case (0177712 >> 1): CPU_TimerRun (); break;
 		case (0177714 >> 1): break;
 		case (0177716 >> 1): break;
 
@@ -291,6 +291,7 @@ static TCPU_Arg CPU_WriteW (TCPU_Arg Adr, uint_fast16_t Word)
 
         	Word |= 0xFF00U;
             MEM16 [Adr >> 1]        = (uint16_t) Word;
+            MEM16 [0177710 >> 1]    = MEM16 [0177706 >> 1];
             Device_Data.Timer.PrevT = Device_Data.CPU_State.Time >> 7;
             Device_Data.Timer.T     = 0;
             Device_Data.Timer.Div	= (~Word >> 4) & 6;
@@ -390,6 +391,7 @@ static uint_fast8_t CPU_WriteB (TCPU_Arg Adr, uint_fast8_t Byte)
 
         	Word |= 0xFF00U;
             MEM16 [Adr >> 1]        = (uint16_t) Word;
+            MEM16 [0177710 >> 1]    = MEM16 [0177706 >> 1];
             Device_Data.Timer.PrevT = Device_Data.CPU_State.Time >> 7;
             Device_Data.Timer.T     = 0;
             Device_Data.Timer.Div	= (~Word >> 4) & 6;
