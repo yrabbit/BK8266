@@ -23,7 +23,7 @@ static void TapeOp (void)
     uint_fast16_t Addr     = MEM16 [(ParamAdr + 2) >> 1];
     uint_fast16_t Size     = MEM16 [(ParamAdr + 4) >> 1];
 
-    static uint32_t Buf [32];
+    static uint32_t Buf [64];
 
     ets_memcpy (Buf, &MEM8 [ParamAdr + 6], 16);
 
@@ -48,37 +48,119 @@ static void TapeOp (void)
             if (Addr == 0) Addr = ((uint16_t *) &Buf [0]) [0];
             Size = ((uint16_t *) &Buf [0]) [1];
 
-            MEM8  [ParamAdr + 1] = 0;
-            MEM16 [0264 >> 1   ] = Addr;
-            MEM16 [0266 >> 1   ] = Size;
-            MEM16 [(ParamAdr + 026) >> 1] = Addr;
-            MEM16 [(ParamAdr + 030) >> 1] = Size;
-
-            Offset = 4;
-
-            while (Size)
+            if (((uint_fast32_t) Addr + Size) > 0100000)
             {
-                ffs_read ((uint16_t) iFile, Offset, (uint8_t *) &Buf [0], sizeof (Buf));
-
-                if (Size >= sizeof (Buf)) {ets_memcpy (&MEM8 [Addr], Buf, sizeof (Buf)); Addr += sizeof (Buf); Size -= sizeof (Buf);}
-                else                      {ets_memcpy (&MEM8 [Addr], Buf,         Size); Addr += Size; break;}
-
-                Offset += sizeof (Buf);
+    	        Addr = 0;
+	            MEM8 [ParamAdr + 1] = 2;
             }
+			else
+			{
+                MEM8  [ParamAdr + 1] = 0;
+                MEM16 [0264 >> 1   ] = Addr;
+                MEM16 [0266 >> 1   ] = Size;
+                MEM16 [(ParamAdr + 026) >> 1] = Addr;
+                MEM16 [(ParamAdr + 030) >> 1] = Size;
 
-            ets_memcpy (&MEM8 [ParamAdr + 032], ffs_name ((uint16_t) iFile), 16);
+                Offset = 4;
 
-            {
-                int Count;
+                while (Size)
+                {
+                    ffs_read ((uint16_t) iFile, Offset, (uint8_t *) &Buf [0], sizeof (Buf));
 
-                for (Count = 0; (Count < 16) && (MEM8 [ParamAdr + 032 + Count] != 0); Count++);
-                for (;          (Count < 16);                                         Count++) MEM8 [ParamAdr + 032 + Count] = ' ';
+                    if (Size >= sizeof (Buf)) {ets_memcpy (&MEM8 [Addr], Buf, sizeof (Buf)); Addr += sizeof (Buf); Size -= sizeof (Buf);}
+                    else                      {ets_memcpy (&MEM8 [Addr], Buf,         Size); Addr += Size; break;}
+
+                    Offset += sizeof (Buf);
+                }
+
+                ets_memcpy (&MEM8 [ParamAdr + 032], ffs_name ((uint16_t) iFile), 16);
+
+                {
+                    int Count;
+
+                    for (Count = 0; (Count < 16) && (MEM8 [ParamAdr + 032 + Count] != 0); Count++);
+                    for (;          (Count < 16);                                         Count++) MEM8 [ParamAdr + 032 + Count] = ' ';
+                }
             }
         }
 
         Device_Data.CPU_State.r [5] = Addr;
         Device_Data.CPU_State.r [7] = MEM16 [Device_Data.CPU_State.r [6] >> 1];
+        Device_Data.CPU_State.r [6] += 2;
+    }
+    else if (Cmd == 2) // Сохранение файла
+    {
+        if (((uint_fast32_t) Addr + Size) > 0100000)
+        {
+            MEM8 [ParamAdr + 1] = 2;
+        }
+		else
+		{
+            int iFile = ffs_find ((char *) &Buf [0]);
 
+            if (iFile >= 0) // Файл уже существует
+            {
+                MEM8 [ParamAdr + 1] = 2;
+            }
+            else
+            {
+    		    // Создаем файл
+    		    iFile = ffs_create ((char *) &Buf [0], TYPE_PROG, Size + sizeof (uint32_t));
+
+                if (iFile < 0) // Файл не создался
+                {
+                    MEM8 [ParamAdr + 1] = 2;
+                }
+                else
+                {
+                	uint_fast16_t offs = sizeof (Buf) - sizeof (uint32_t);
+
+                    MEM8  [ParamAdr + 1] = 0;
+                    MEM16 [0264 >> 1   ] = Addr;
+                    MEM16 [0266 >> 1   ] = Size;
+                    MEM16 [(ParamAdr + 026) >> 1] = Addr;
+                    MEM16 [(ParamAdr + 030) >> 1] = Size;
+
+	                ets_memcpy (&MEM8 [ParamAdr + 032], ffs_name ((uint16_t) iFile), 16);
+
+					((uint16_t *) &Buf [0]) [0] = Addr;
+					((uint16_t *) &Buf [0]) [1] = Size;
+
+					if (Size > sizeof (Buf) - sizeof (uint32_t))
+					{
+						ets_memcpy (&Buf [1], &MEM8 [Addr], sizeof (Buf) - sizeof (uint32_t));
+						Size -= sizeof (Buf) - sizeof (uint32_t);
+						Addr += sizeof (Buf) - sizeof (uint32_t);
+					}
+					else
+					{
+						ets_memcpy (&Buf [1], &MEM8 [Addr], Size);
+						Size = 0;
+					}
+					ffs_writeData (iFile, 0, (uint8_t *) &Buf [0], sizeof (Buf));
+
+					while (Size)
+					{
+    					if (Size > sizeof (Buf))
+    					{
+    						ets_memcpy (Buf, &MEM8 [Addr], sizeof (Buf));
+    						Size -= sizeof (Buf);
+    						Addr += sizeof (Buf);
+    					}
+    					else
+    					{
+    						ets_memcpy (Buf, &MEM8 [Addr], Size);
+    						Size = 0;
+    					}
+
+    					ffs_writeData (iFile, offs, (uint8_t *) &Buf [0], sizeof (Buf));
+    					offs += sizeof (Buf);
+					}
+                }
+            }
+		}
+
+        Device_Data.CPU_State.r [7] = MEM16 [Device_Data.CPU_State.r [6] >> 1];
         Device_Data.CPU_State.r [6] += 2;
     }
 }
