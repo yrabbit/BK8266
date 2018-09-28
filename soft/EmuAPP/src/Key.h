@@ -34,14 +34,14 @@ enum
 #define KEY_FLAGS_TURBO_POS     8
 #define KEY_FLAGS_NUMLOCK_POS   9
 #define KEY_FLAGS_UP_POS        10
-#define KEY_FLAGS_RIGHT_POS     11
-#define KEY_FLAGS_DOWN_POS      12
-#define KEY_FLAGS_LEFT_POS      13
-#define KEY_FLAGS_BTN1_POS      15
-#define KEY_FLAGS_BTN2_POS      16
-#define KEY_FLAGS_BTN3_POS      17
-#define KEY_FLAGS_BTN4_POS      18
-#define KEY_FLAGS_BTN5_POS      19
+#define KEY_FLAGS_BTN1_POS      11
+#define KEY_FLAGS_RIGHT_POS     12
+#define KEY_FLAGS_DOWN_POS      13
+#define KEY_FLAGS_LEFT_POS      14
+#define KEY_FLAGS_BTN2_POS      15
+#define KEY_FLAGS_BTN3_POS      16
+#define KEY_FLAGS_BTN4_POS      17
+#define KEY_FLAGS_BTN5_POS      18
 
 #define KEY_FLAGS_RUSLAT        (1UL << KEY_FLAGS_RUSLAT_POS  )
 #define KEY_FLAGS_LALT          (1UL << KEY_FLAGS_LALT_POS    )
