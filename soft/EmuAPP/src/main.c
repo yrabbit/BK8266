@@ -236,7 +236,8 @@ void main_program(void)
             {
                 uint_fast16_t Key = Key_Translate (CodeAndFlags);
 
-                MEM16 [0177714 >> 1] = (uint16_t) (Key_Flags >> KEY_FLAGS_UP_POS);
+                if (Key_Flags & KEY_FLAGS_NUMLOCK) MEM16 [0177714 >> 1] = (uint16_t) (Key_Flags >> KEY_FLAGS_UP_POS);
+                else                               MEM16 [0177714 >> 1] = 0;
 
                 if (CodeAndFlags & 0x8000U)
                 {
