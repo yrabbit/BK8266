@@ -5,7 +5,7 @@
 #include "ets.h"
 
 
-bool menu_fileman(void);
+int_fast16_t menu_fileman (uint_fast8_t Load);
 
 void menu(void);
 

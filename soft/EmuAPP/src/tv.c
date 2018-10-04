@@ -5,6 +5,7 @@
 #include "i2s.h"
 #include "board.h"
 #include "CPU.h"
+#include "ui.h"
 
 #define N_BUFS      8   // должно быть больше 4
 #define T_DELAY_N   6
@@ -131,6 +132,8 @@ static struct
     uint8_t  iBuf;
     uint8_t  SyncFieldLine;
     uint8_t  BkLine;
+    uint8_t  MenuY;
+    uint8_t  ShowMenu;
     uint16_t MinLine;
     uint16_t Line;
     int32_t  SyncProgram;
@@ -224,24 +227,66 @@ static const uint32_t* tv_i2s_cb(void)
                 // Рисуем строку
                 uint32_t     *pTempBuf = &pBuf [5];
                 uint_fast8_t BkLine    = TV_Data.BkLine;
-                uint32_t     *pVRam    = &MEM32 [0x1000 + BkLine * 16];
                 uint_fast8_t Count;
 
-                TV_Data.BkLine = (uint8_t) (BkLine + 1);
+				if (TV_Data.ShowMenu)
+            	{
+            		uint_fast8_t y       =  TV_Data.MenuY;
+	                char         *pText  =  UI_Data.scr [y];
+	                uint8_t      *pZkg   = &MEM8 [CPU_ZKG_OFFSET + BkLine];
+	                int_fast8_t  CursorX = -1;
 
-                for (Count = 0; Count < 16; Count++)
-                {
-                    uint_fast32_t U32;
+	                if (y == UI_Data.CursorY) CursorX = UI_Data.CursorX;
 
-                    U32 = *pVRam++;
+            		if (++BkLine >= 10)
+            		{
+            			BkLine        = 0;
+            			TV_Data.MenuY = (uint8_t) (y + 1);
+            		}
 
-                    U32 = (U32 & 0x55555555UL) << 1 | ((U32 >> 1) & 0x55555555UL);
-                    U32 = (U32 & 0x33333333UL) << 2 | ((U32 >> 2) & 0x33333333UL);
-                    U32 = (U32 & 0x0F0F0F0FUL) << 4 | ((U32 >> 4) & 0x0F0F0F0FUL);
-                    U32 = (U32 << 24) | ((U32 & 0xFF00U) << 8) | ((U32 >> 8) & 0xFF00U) | (U32 >> 24);
+	                TV_Data.BkLine = (uint8_t) BkLine;
 
-                    *pTempBuf++ = (uint32_t) U32;
-                }
+            		for (Count = 0; Count < 16; Count++)
+            		{
+            			uint_fast32_t U32;
+
+            			U32  = pZkg [(*pText++) * 10] << 16;
+            			U32 |= pZkg [(*pText++) * 10];
+
+            			if ((CursorX >> 1) == Count)
+            			{
+	            			if (CursorX & 1) U32 ^= 0x000000FFUL;
+	            			else             U32 ^= 0x00FF0000UL;
+            			}
+
+            			U32 = (U32 & 0x000F000FUL) << 8 | ((U32 >> 4) & 0x000F000FUL);
+            			U32 = (U32 & 0x03030303UL) << 4 | ((U32 >> 2) & 0x03030303UL);
+            			U32 = (U32 & 0x11111111UL) << 2 | ((U32 >> 1) & 0x11111111UL);
+						U32 |= U32 << 1;
+
+                        *pTempBuf++ = (uint32_t) U32;
+            		}
+            	}
+            	else
+            	{
+	                uint32_t *pVRam = &MEM32 [0x1000 + BkLine * 16];
+
+	                TV_Data.BkLine = (uint8_t) (BkLine + 1);
+
+                    for (Count = 0; Count < 16; Count++)
+                    {
+                        uint_fast32_t U32;
+
+                        U32 = *pVRam++;
+
+                        U32 = (U32 & 0x55555555UL) << 1 | ((U32 >> 1) & 0x55555555UL);
+                        U32 = (U32 & 0x33333333UL) << 2 | ((U32 >> 2) & 0x33333333UL);
+                        U32 = (U32 & 0x0F0F0F0FUL) << 4 | ((U32 >> 4) & 0x0F0F0F0FUL);
+                        U32 = (U32 << 24) | ((U32 & 0xFF00U) << 8) | ((U32 >> 8) & 0xFF00U) | (U32 >> 24);
+
+                        *pTempBuf++ = (uint32_t) U32;
+                    }
+            	}
             }
 
             return pBuf;
@@ -290,6 +335,14 @@ static const uint32_t* tv_i2s_cb(void)
 
         TV_Data.Line = 304;
 
+        if (UI_Data.Show)
+        {
+        	TV_Data.ShowMenu = 1;
+        	TV_Data.MinLine  = 25;
+            TV_Data.BkLine   = 0;
+            TV_Data.MenuY    = 0;
+        }
+        else
         {
             uint_fast16_t Reg = MEM16 [0177664 >> 1];
 
@@ -297,6 +350,8 @@ static const uint32_t* tv_i2s_cb(void)
 
             if (Reg & 01000) TV_Data.MinLine = 19;
             else             TV_Data.MinLine = 19 + 192;
+
+        	TV_Data.ShowMenu = 0;
         }
 
         // Меняем поле

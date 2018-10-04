@@ -5,14 +5,12 @@
 #include "CPU.h"
 #include "board.h"
 #include "gpio_lib.h"
+#include "ets.h"
 
 TDevice_Data Device_Data;
 
-uint16_t __attribute__((section(".bkram.bss" ))) bkram [0100000 >> 1];
-uint16_t __attribute__((section(".bkrom.data"))) bkrom [0100000 >> 1] =
-{
-    #include "rom.h"
-};
+//uint16_t __attribute__((section(".bkram.bss" ))) bkram [0100000 >> 1];
+//uint16_t __attribute__((section(".bkrom.data"))) bkrom [0100000 >> 1];
 
 #define  CPU_ARG_REG        0x40000000UL
 #define  CPU_ARG_FAULT      0x80000000UL
@@ -131,108 +129,108 @@ const uint8_t CPU_timing_TwoOps_BIS [64] =
 
 void CPU_TimerRun (void)
 {
-	uint_fast16_t Cfg = MEM16 [0177712 >> 1];
+    uint_fast16_t Cfg = MEM16 [0177712 >> 1];
 
-	//если счётчик остановлен
-	if (Cfg & 1)
-	{
-		MEM16 [0177710 >> 1] = MEM16 [0177706 >> 1]; //проинициализируем регистр счётчика
-	}
-	else if (Cfg & 020) //если счётчик запущен
-	{
-    	uint_fast32_t CurT = Device_Data.CPU_State.Time >> 7;
-    	uint_fast32_t T    = Device_Data.Timer.T + (((CurT - Device_Data.Timer.PrevT) & 0xFFFFFF) << Device_Data.Timer.Div);
-		int_fast32_t  Cntr = MEM16 [0177710 >> 1];
+    //если счётчик остановлен
+    if (Cfg & 1)
+    {
+        MEM16 [0177710 >> 1] = MEM16 [0177706 >> 1]; //проинициализируем регистр счётчика
+    }
+    else if (Cfg & 020) //если счётчик запущен
+    {
+        uint_fast32_t CurT = Device_Data.CPU_State.Time >> 7;
+        uint_fast32_t T    = Device_Data.Timer.T + (((CurT - Device_Data.Timer.PrevT) & 0xFFFFFF) << Device_Data.Timer.Div);
+        int_fast32_t  Cntr = MEM16 [0177710 >> 1];
 
-		Device_Data.Timer.PrevT = CurT;
-		Device_Data.Timer.T  = T & 0x3F;
+        Device_Data.Timer.PrevT = CurT;
+        Device_Data.Timer.T  = T & 0x3F;
 
-		T >>= 6;
+        T >>= 6;
 
-		if (Cntr == 0 || (Cfg & 2)) //если счетчик уже был равен 0 или режим WRAPAROUND
-		{
-			Cntr -= T;
-		}
-		else
-		{
-			Cntr -= T;
+        if (Cntr == 0 || (Cfg & 2)) //если счетчик уже был равен 0 или режим WRAPAROUND
+        {
+            Cntr -= T;
+        }
+        else
+        {
+            Cntr -= T;
 
-			if (Cntr <= 0)
-			{
-				uint_fast16_t InitVal = MEM16 [0177706 >> 1];
+            if (Cntr <= 0)
+            {
+                uint_fast16_t InitVal = MEM16 [0177706 >> 1];
 
-				if (Cfg & 4) //разрешение установки сигнала "конец счёта" ?
-				{
-					Cfg |= 0200;    //да, установим сигнал
-				}
+                if (Cfg & 4) //разрешение установки сигнала "конец счёта" ?
+                {
+                    Cfg |= 0200;    //да, установим сигнал
+                }
 
-				if (Cfg & 010) //установлен режим одновибратора?
-				{
-					Cfg &= ~020;    //тогда сбросим бит 4
+                if (Cfg & 010) //установлен режим одновибратора?
+                {
+                    Cfg &= ~020;    //тогда сбросим бит 4
 
-					Cntr = InitVal; //проинициализируем регистр счётчика
-				}
-				else if (InitVal)
-				{
-					do
-					{
-						Cntr += InitVal; //проинициализируем регистр счётчика
+                    Cntr = InitVal; //проинициализируем регистр счётчика
+                }
+                else if (InitVal)
+                {
+                    do
+                    {
+                        Cntr += InitVal; //проинициализируем регистр счётчика
 
-					} while (Cntr <= 0);
-				}
+                    } while (Cntr <= 0);
+                }
 
-				MEM16 [0177712 >> 1] = Cfg;
-			}
-		}
+                MEM16 [0177712 >> 1] = Cfg;
+            }
+        }
 
-		MEM16 [0177710 >> 1] = (uint16_t) Cntr;
-	}
+        MEM16 [0177710 >> 1] = (uint16_t) Cntr;
+    }
 }
 
 static TCPU_Arg CPU_ReadW (TCPU_Arg Adr)
 {
     if (CPU_IS_ARG_REG (Adr)) return R [CPU_GET_ARG_REG_INDEX (Adr)];
 
-	if (Adr < 0177600) return MEM16 [Adr >> 1];
+    if (Adr < 0177600) return MEM16 [Adr >> 1];
 
-	switch (Adr >> 1)
-	{
-		case (0177660 >> 1): break;
-		case (0177662 >> 1): MEM16 [0177660 >> 1] &= ~0200; break;
-		case (0177664 >> 1): break;
-		case (0177706 >> 1): break;
-		case (0177710 >> 1): CPU_TimerRun (); break;
-		case (0177712 >> 1): CPU_TimerRun (); break;
-		case (0177714 >> 1): break;
-		case (0177716 >> 1): break;
+    switch (Adr >> 1)
+    {
+        case (0177660 >> 1): break;
+        case (0177662 >> 1): MEM16 [0177660 >> 1] &= ~0200; break;
+        case (0177664 >> 1): break;
+        case (0177706 >> 1): break;
+        case (0177710 >> 1): CPU_TimerRun (); break;
+        case (0177712 >> 1): CPU_TimerRun (); break;
+        case (0177714 >> 1): break;
+        case (0177716 >> 1): break;
 
-		default: return CPU_ARG_READ_ERR;
-	}
+        default: return CPU_ARG_READ_ERR;
+    }
 
-	return MEM16 [Adr >> 1];
+    return MEM16 [Adr >> 1];
 }
 
 static TCPU_Arg CPU_ReadB (TCPU_Arg Adr)
 {
     if (CPU_IS_ARG_REG (Adr)) return (*(uint8_t *) &R [CPU_GET_ARG_REG_INDEX (Adr)]);
 
-	if (Adr < 0177600) return MEM8 [Adr];
+    if (Adr < 0177600) return MEM8 [Adr];
 
-	switch (Adr >> 1)
-	{
-		case (0177660 >> 1): break;
-		case (0177662 >> 1): MEM16 [0177660 >> 1] &= ~0200; break;
-		case (0177664 >> 1): break;
-		case (0177706 >> 1): break;
-		case (0177710 >> 1): CPU_TimerRun (); break;
-		case (0177712 >> 1): CPU_TimerRun (); break;
-		case (0177714 >> 1): break;
-		case (0177716 >> 1): break;
+    switch (Adr >> 1)
+    {
+        case (0177660 >> 1): break;
+        case (0177662 >> 1): MEM16 [0177660 >> 1] &= ~0200; break;
+        case (0177664 >> 1): break;
+        case (0177706 >> 1): break;
+        case (0177710 >> 1): CPU_TimerRun (); break;
+        case (0177712 >> 1): CPU_TimerRun (); break;
+        case (0177714 >> 1): break;
+        case (0177716 >> 1): break;
 
-		default: return CPU_ARG_READ_ERR;
-	}
+        default: return CPU_ARG_READ_ERR;
+    }
 
-	return MEM8 [Adr];
+    return MEM8 [Adr];
 }
 
 static TCPU_Arg CPU_ReadMemW (TCPU_Arg Adr)
@@ -282,19 +280,19 @@ static TCPU_Arg CPU_WriteW (TCPU_Arg Adr, uint_fast16_t Word)
 
         case (0177706 >> 1):
 
-        	CPU_TimerRun ();
+            CPU_TimerRun ();
             MEM16 [Adr >> 1] = (uint16_t) Word;
             break;
 
 //      case (0177710 >> 1):
         case (0177712 >> 1):
 
-        	Word |= 0xFF00U;
+            Word |= 0xFF00U;
             MEM16 [Adr >> 1]        = (uint16_t) Word;
             MEM16 [0177710 >> 1]    = MEM16 [0177706 >> 1];
             Device_Data.Timer.PrevT = Device_Data.CPU_State.Time >> 7;
             Device_Data.Timer.T     = 0;
-            Device_Data.Timer.Div	= (~Word >> 4) & 6;
+            Device_Data.Timer.Div   = (~Word >> 4) & 6;
             break;
 
         case (0177714 >> 1):
@@ -302,12 +300,12 @@ static TCPU_Arg CPU_WriteW (TCPU_Arg Adr, uint_fast16_t Word)
             Device_Data.SysRegs.WrReg177714 = (uint16_t) Word;
 
             {
-            	uint_fast32_t Reg = (Word & 0xFF) >> 1;
-            	if (Device_Data.SysRegs.WrReg177716 & 0100) Reg += 0x80;
-				WRITE_PERI_REG (GPIO_SIGMA_DELTA_ADDRESS,   SIGMA_DELTA_ENABLE
-														  | (Reg << SIGMA_DELTA_TARGET_S)
-														  | (1 << SIGMA_DELTA_PRESCALAR_S));
-			}
+                uint_fast32_t Reg = (Word & 0xFF) >> 1;
+                if (Device_Data.SysRegs.WrReg177716 & 0100) Reg += 0x80;
+                WRITE_PERI_REG (GPIO_SIGMA_DELTA_ADDRESS,   SIGMA_DELTA_ENABLE
+                                                          | (Reg << SIGMA_DELTA_TARGET_S)
+                                                          | (1 << SIGMA_DELTA_PRESCALAR_S));
+            }
 
             break;
 
@@ -316,12 +314,12 @@ static TCPU_Arg CPU_WriteW (TCPU_Arg Adr, uint_fast16_t Word)
             Device_Data.SysRegs.WrReg177716 = (uint16_t) Word;
 
             {
-            	uint_fast32_t Reg = *(uint8_t *) &Device_Data.SysRegs.WrReg177714 >> 1;
-            	if (Word & 0100) Reg += 0x80;
-				WRITE_PERI_REG (GPIO_SIGMA_DELTA_ADDRESS,   SIGMA_DELTA_ENABLE
-														  | (Reg << SIGMA_DELTA_TARGET_S)
-														  | (1 << SIGMA_DELTA_PRESCALAR_S));
-			}
+                uint_fast32_t Reg = *(uint8_t *) &Device_Data.SysRegs.WrReg177714 >> 1;
+                if (Word & 0100) Reg += 0x80;
+                WRITE_PERI_REG (GPIO_SIGMA_DELTA_ADDRESS,   SIGMA_DELTA_ENABLE
+                                                          | (Reg << SIGMA_DELTA_TARGET_S)
+                                                          | (1 << SIGMA_DELTA_PRESCALAR_S));
+            }
 
             break;
 
@@ -337,7 +335,7 @@ static TCPU_Arg CPU_WriteW (TCPU_Arg Adr, uint_fast16_t Word)
 
 static uint_fast8_t CPU_WriteB (TCPU_Arg Adr, uint_fast8_t Byte)
 {
-	uint_fast16_t Word;
+    uint_fast16_t Word;
     uint_fast16_t PrevWord;
 
     if (CPU_IS_ARG_REG (Adr))
@@ -354,9 +352,9 @@ static uint_fast8_t CPU_WriteB (TCPU_Arg Adr, uint_fast8_t Byte)
         return CPU_ARG_WRITE_OK;
     }
 
-	Word = Byte;
+    Word = Byte;
 
-	if (Adr & 1) Word <<= 8;
+    if (Adr & 1) Word <<= 8;
 
     switch (Adr >> 1)
     {
@@ -382,19 +380,19 @@ static uint_fast8_t CPU_WriteB (TCPU_Arg Adr, uint_fast8_t Byte)
 
         case (0177706 >> 1):
 
-        	CPU_TimerRun ();
+            CPU_TimerRun ();
             MEM16 [Adr >> 1] = (uint16_t) Word;
             break;
 
 //      case (0177710 >> 1):
         case (0177712 >> 1):
 
-        	Word |= 0xFF00U;
+            Word |= 0xFF00U;
             MEM16 [Adr >> 1]        = (uint16_t) Word;
             MEM16 [0177710 >> 1]    = MEM16 [0177706 >> 1];
             Device_Data.Timer.PrevT = Device_Data.CPU_State.Time >> 7;
             Device_Data.Timer.T     = 0;
-            Device_Data.Timer.Div	= (~Word >> 4) & 6;
+            Device_Data.Timer.Div   = (~Word >> 4) & 6;
             break;
 
         case (0177714 >> 1):
@@ -402,12 +400,12 @@ static uint_fast8_t CPU_WriteB (TCPU_Arg Adr, uint_fast8_t Byte)
             Device_Data.SysRegs.WrReg177714 = (uint16_t) Word;
 
             {
-            	uint_fast32_t Reg = (Word & 0xFF) >> 1;
-            	if (Device_Data.SysRegs.WrReg177716 & 0100) Reg += 0x80;
-				WRITE_PERI_REG (GPIO_SIGMA_DELTA_ADDRESS,   SIGMA_DELTA_ENABLE
-														  | (Reg << SIGMA_DELTA_TARGET_S)
-														  | (1 << SIGMA_DELTA_PRESCALAR_S));
-			}
+                uint_fast32_t Reg = (Word & 0xFF) >> 1;
+                if (Device_Data.SysRegs.WrReg177716 & 0100) Reg += 0x80;
+                WRITE_PERI_REG (GPIO_SIGMA_DELTA_ADDRESS,   SIGMA_DELTA_ENABLE
+                                                          | (Reg << SIGMA_DELTA_TARGET_S)
+                                                          | (1 << SIGMA_DELTA_PRESCALAR_S));
+            }
 
             break;
 
@@ -416,12 +414,12 @@ static uint_fast8_t CPU_WriteB (TCPU_Arg Adr, uint_fast8_t Byte)
             Device_Data.SysRegs.WrReg177716 = (uint16_t) Word;
 
             {
-            	uint_fast32_t Reg = *(uint8_t *) &Device_Data.SysRegs.WrReg177714 >> 1;
-            	if (Word & 0100) Reg += 0x80;
-				WRITE_PERI_REG (GPIO_SIGMA_DELTA_ADDRESS,   SIGMA_DELTA_ENABLE
-														  | (Reg << SIGMA_DELTA_TARGET_S)
-														  | (1 << SIGMA_DELTA_PRESCALAR_S));
-			}
+                uint_fast32_t Reg = *(uint8_t *) &Device_Data.SysRegs.WrReg177714 >> 1;
+                if (Word & 0100) Reg += 0x80;
+                WRITE_PERI_REG (GPIO_SIGMA_DELTA_ADDRESS,   SIGMA_DELTA_ENABLE
+                                                          | (Reg << SIGMA_DELTA_TARGET_S)
+                                                          | (1 << SIGMA_DELTA_PRESCALAR_S));
+            }
 
             break;
 
@@ -1864,9 +1862,9 @@ void CPU_Reset (void)
 //  MEM16 [0177660 >> 1] = 0;
 //  MEM16 [0177662 >> 1] = 0;
     MEM16 [0177664 >> 1] = 01330;
-//	MEM16 [0177706 >> 1] = 0;
-//	MEM16 [0177710 >> 1] = 0177777;
-//	MEM16 [0177712 >> 1] = 0177400;
+//  MEM16 [0177706 >> 1] = 0;
+//  MEM16 [0177710 >> 1] = 0177777;
+//  MEM16 [0177712 >> 1] = 0177400;
 //  MEM16 [0177714 >> 1] = 0;
     MEM16 [0177716 >> 1] = (0100000 & 0177400) | 0300;
 
@@ -1881,16 +1879,19 @@ void CPU_Reset (void)
 
 void CPU_Init (void)
 {
+    // Читаем ПЗУ БК
+    SPIRead (0x50000, &(MEM8 [0x8000]), sizeof (uint8_t) * 0x8000);
+
     CPU_Reset ();
 
     //============================================================================
     //STEP 1: SIGMA-DELTA CONFIG;REG SETUP
 
-	WRITE_PERI_REG (GPIO_SIGMA_DELTA_ADDRESS,   SIGMA_DELTA_ENABLE
-											  | (0x80 << SIGMA_DELTA_TARGET_S)
-											  | (1 << SIGMA_DELTA_PRESCALAR_S));
+    WRITE_PERI_REG (GPIO_SIGMA_DELTA_ADDRESS,   SIGMA_DELTA_ENABLE
+                                              | (0x80 << SIGMA_DELTA_TARGET_S)
+                                              | (1 << SIGMA_DELTA_PRESCALAR_S));
 
-	//============================================================================
+    //============================================================================
     //STEP 2: PIN FUNC CONFIG :SET PIN TO GPIO MODE AND ENABLE OUTPUT
 
     // Инитим порт пищалки
@@ -1900,4 +1901,13 @@ void CPU_Init (void)
     //============================================================================
     //STEP 3: CONNECT SIGNAL TO GPIO PAD
     WRITE_PERI_REG (PERIPHS_GPIO_BASEADDR + (10 + BEEPER) * 4, READ_PERI_REG (PERIPHS_GPIO_BASEADDR + (10 + BEEPER) * 4) | 1);
+}
+
+char CPU_koi8_to_zkg (char C)
+{
+    if (C < 0x20) return 0;
+    if (C < 0x80) return C - 0x20;
+    if (C < 0xA0) return 0;
+
+    return C - 0x40;
 }

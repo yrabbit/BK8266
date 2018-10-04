@@ -88,7 +88,7 @@ static void f_erase(uint32_t pos)
 }
 
 
-static void ffs_cvt_name(const char *name, char *tmp)
+void ffs_cvt_name(const char *name, char *tmp)
 {
     uint8_t i=0;
     uint8_t Size=0;

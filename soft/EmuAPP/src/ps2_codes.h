@@ -128,13 +128,15 @@
 
 
 // Keyboard symbols
-#define KEY_ENTER	'\n'
-#define KEY_ESC		'x'
-#define KEY_BACKSPACE	8
-#define KEY_UP		'u'
-#define KEY_DOWN	'd'
-#define KEY_LEFT	'l'
-#define KEY_RIGHT	'r'
+#define KEY_MENU_ENTER	10
+#define KEY_MENU_ESC		5
+#define KEY_MENU_DELETE     6
+#define KEY_MENU_BACKSPACE	24
+#define KEY_MENU_UP		26
+#define KEY_MENU_DOWN	27
+#define KEY_MENU_LEFT	8
+#define KEY_MENU_RIGHT	25
+#define KEY_MENU_SPACE	32
 
 
 char ps2_sym(void);

@@ -62,6 +62,7 @@ uint32_t ffs_flash_addr(uint16_t n);
 void ffs_remove(uint16_t n);
 int16_t ffs_rename(uint16_t n, const char *fname);
 
+void ffs_cvt_name(const char *name, char *tmp);
 const char* ffs_name(uint16_t n);	// в статической переменной
 const char* ffs_name_utf8 (uint16_t n); // в статической переменной
 

@@ -3,8 +3,8 @@
 
 #include <stdint.h>
 
-#define Key_SetNewRusLat() Key_Flags |=  KEY_FLAGS_RUSLAT
-#define Key_ClrNewRusLat() Key_Flags &= ~KEY_FLAGS_RUSLAT
+#define Key_SetRusLat() Key_Flags |=  KEY_FLAGS_RUSLAT
+#define Key_ClrRusLat() Key_Flags &= ~KEY_FLAGS_RUSLAT
 
 enum
 {
@@ -16,6 +16,7 @@ enum
     KEY_SCROLL,
     KEY_NUMLOCK,
     KEY_SPACE,
+    KEY_ESC,
     KEY_A,
     KEY_S,
     KEY_D,
@@ -66,6 +67,8 @@ enum
 #define KEY_AR2_PRESSED 0x8000
 
 extern uint32_t Key_Flags;
+
+#define KEY_TRANSLATE_UI 0x4000
 
 uint_fast16_t Key_Translate (uint_fast16_t CodeAndFlags);
 

@@ -1,71 +1,46 @@
 #include "ui.h"
-
 #include "ets.h"
-#include "vg75.h"
 #include "ps2.h"
 #include "ps2_codes.h"
 #include "xprintf.h"
-#include "zkg.h"
-#include "i8080.h"
-#include "i8080_hal.h"
-#include "xlat.h"
+#include "CPU.h"
 #include "align4.h"
-#include "ffs.h"
 #include "timer0.h"
+#include "Key.h"
 
-#include "menu.h"
 
-
-char ui_scr[38][80];
+TUI_Data UI_Data;
 
 
 void ui_clear(void)
 {
-    ets_memset(ui_scr, 0x00, sizeof(ui_scr));
+    ets_memset(UI_Data.scr, CPU_koi8_to_zkg(' '), sizeof(UI_Data.scr));
 }
 
 
-#define HEADER_Y	4
+#define HEADER_X    0
+#define HEADER_Y    0
 void ui_header(const char *s)
 {
-    static const uint8_t syms[]=
-	{
-	    0, 4, 16, 20, 2, 6, 18, 22,
-	    1, 5, 17, 21, 3, 7, 19, 23
-	};
-    uint8_t l=ets_strlen(s);
-    uint8_t x=(78-l*3)/2;	// каждый символ отображается как 3 символа
-    uint8_t y;
-    
-    // Рисуем строки
-    for (y=0; y<4; y++)
-    {
-	uint8_t i;
-	for (i=0; i<l; i++)
-	{
-	    uint8_t c=r_u8(&xlat[(uint8_t)s[i]]);
-	    uint8_t b1=r_u8(&zkg[0][ ((y*2+0) << 7) + c]);
-	    uint8_t b2=r_u8(&zkg[0][ ((y*2+1) << 7) + c]);
-	    ui_scr[HEADER_Y+y][x+i*3+0]=syms[ ((b1 >> 2) & 0x0C) | ((b2 >> 4) & 0x03) ];
-	    ui_scr[HEADER_Y+y][x+i*3+1]=syms[ (b1 & 0x0C) | ((b2 >> 2) & 0x03) ];
-	    ui_scr[HEADER_Y+y][x+i*3+2]=syms[ ((b1 << 2) & 0x0C) | (b2  & 0x03) ];
-	}
-    }
+    ui_draw_text(HEADER_X, HEADER_Y, s);
 }
 
-
-#define LIST_Y	10
-#define LIST_X	10
-void ui_draw_list(const char *s)
+void ui_header_default(void)
 {
-    uint8_t y=LIST_Y;
+    ui_draw_text(HEADER_X, HEADER_Y, " ЭМУЛЯТОР БК-0010-01 НА ESP8266");
+}
+
+void ui_draw_list(uint8_t x, uint8_t y, const char *s)
+{
+    x += 3;
+
     while (*s)
     {
-	uint8_t x;
-	for (x=LIST_X; (*s) && ((*s)!='\n'); x++)
-	    ui_scr[y][x]=r_u8(&xlat[(uint8_t)(*s++)]);
-	if (*s) s++;	// пропускаем '\n'
-	y++;
+    uint8_t x_tmp;
+    for (x_tmp=x; (*s) && ((*s)!='\n'); x_tmp++)
+        UI_Data.scr[y][x_tmp]=CPU_koi8_to_zkg((uint8_t)(*s++));
+    if (*s) s++;    // пропускаем '\n'
+    y++;
     }
 }
 
@@ -74,78 +49,78 @@ void ui_draw_text(uint8_t x, uint8_t y, const char *s)
 {
     while (*s)
     {
-	uint8_t xx;
-	for (xx=x; (*s) && ((*s)!='\n'); xx++)
-	    ui_scr[y][xx]=r_u8(&xlat[(uint8_t)(*s++)]);
-	if (*s) s++;	// пропускаем '\n'
-	y++;
+    uint8_t xx;
+    for (xx=x; (*s) && ((*s)!='\n'); xx++)
+        UI_Data.scr[y][xx]=CPU_koi8_to_zkg((uint8_t)(*s++));
+    if (*s) s++;    // пропускаем '\n'
+    y++;
     }
 }
 
 
-int8_t ui_select(uint8_t count)
+int8_t ui_select(uint8_t x, uint8_t y, uint8_t count)
 {
     uint8_t n=0, prev=0;
     
     while (1)
     {
-	// Очищаем предыдущую позицию
-	ets_memcpy(&ui_scr[LIST_Y + (prev % 20)][LIST_X-4 + (prev / 20)*16], "    ", 4);
-	
-	// Рисуем новую позицию
-	ets_memcpy(&ui_scr[LIST_Y + (n % 20)][LIST_X-4 + (n / 20)*16], "--> ", 4);
-	
-	// Сохраняем текущую позицию как предыдущую для перерисовки
-	prev=n;
-	
-	// Читаем клаву
-	while (1)
-	{
-	    char c=ps2_sym();
-	    if (c==KEY_ESC)
-	    {
-		// Отмена
-		return -1;
-	    } else
-	    if (c==KEY_ENTER)
-	    {
-	        // Ввод
-	        return n;
-	    } else
-	    if ( (c==KEY_UP) && (n > 0) )
-	    {
-		// Вверх
-		n--;
-		break;
-	    } else
-	    if ( (c==KEY_DOWN) && (n < count-1) )
-	    {
-		// Вниз
-		n++;
-		break;
-	    } else
-	    if ( (c==KEY_LEFT) && (n > 0) )
-	    {
-		// Влево
-		if (n > 20) n-=20; else n=0;
-		break;
-	    } else
-	    if ( (c==KEY_RIGHT) && (n < count-1) )
-	    {
-		// Вправо
-		n+=20;
-		if (n >= count) n=count-1;
-		break;
-	    } else
-	    if ( (c>='1') && (c<='9') )
-	    {
-		// Выбор нужного пункта по номеру
-		if (c-'1' < count)
-		{
-		    return c-'1';
-		}
-	    }
-	}
+    // Очищаем предыдущую позицию
+    ui_draw_text (x + (prev / 16)*16, y + (prev % 16), "   ");
+    
+    // Рисуем новую позицию
+    ui_draw_text (x + (n    / 16)*16, y + (n    % 16), "-->");
+
+    // Сохраняем текущую позицию как предыдущую для перерисовки
+    prev=n;
+    
+    // Читаем клаву
+    while (1)
+    {
+        uint_fast16_t c=ui_GetKey();
+        if (c==KEY_MENU_ESC)
+        {
+        // Отмена
+        return -1;
+        } else
+        if (c==KEY_MENU_ENTER)
+        {
+            // Ввод
+            return n;
+        } else
+        if ( (c==KEY_MENU_UP) && (n > 0) )
+        {
+        // Вверх
+        n--;
+        break;
+        } else
+        if ( (c==KEY_MENU_DOWN) && (n < count-1) )
+        {
+        // Вниз
+        n++;
+        break;
+        } else
+        if ( (c==KEY_MENU_LEFT) && (n > 0) )
+        {
+        // Влево
+        if (n > 20) n-=20; else n=0;
+        break;
+        } else
+        if ( (c==KEY_MENU_RIGHT) && (n < count-1) )
+        {
+        // Вправо
+        n+=20;
+        if (n >= count) n=count-1;
+        break;
+        } else
+        if ( (c>='1') && (c<='9') )
+        {
+        // Выбор нужного пункта по номеру
+        if (c-'1' < count)
+        {
+            return c-'1';
+        }
+        }
+    }
     }
 }
 
@@ -154,59 +129,59 @@ const char* ui_input_text(const char *comment, const char *_text, uint8_t max_le
 {
     static char text[64];
     uint8_t pos;
-    char c;
+    uint_fast16_t c;
     
-#define EDIT_X	10
-#define EDIT_Y	9
+#define EDIT_X  0
+#define EDIT_Y  4
     if (_text)
     {
-	// Есть текст
-	ets_strcpy(text, _text);
-	pos=ets_strlen(text);
+    // Есть текст
+    ets_strcpy(text, _text);
+    pos=ets_strlen(text);
     } else
     {
-	// Нет текста - начинаем с пустой строки
-	text[0]=0;
-	pos=0;
+    // Нет текста - начинаем с пустой строки
+    text[0]=0;
+    pos=0;
     }
     
-    screen.cursor_x=EDIT_X+pos;
-    screen.cursor_y=EDIT_Y;
+    UI_Data.CursorX=EDIT_X+pos;
+    UI_Data.CursorY=EDIT_Y;
     ui_clear();
-    ui_header("РАДИО-86РК -->");
-    ui_draw_text(10, 8, comment);
+    ui_header_default();
+    ui_draw_text(0, 3, comment);
     ui_draw_text(EDIT_X, EDIT_Y, text);
     while (1)
     {
-	c=ps2_sym();
-	if (c==KEY_ESC)
-	{
-	    // Отмена
-	    screen.cursor_y=99;
-	    return 0;
-	} else
-	if ( (c==KEY_ENTER) && (pos > 0) )
-	{
-	    // Сохранение
-	    text[pos]=0;
-	    screen.cursor_y=99;
-	    return text;
-	} else
-	if ( (c==KEY_BACKSPACE) && (pos > 0) )
-	{
-	    // Забой
-	    screen.cursor_x--;
-	    pos--;
-	    ui_scr[EDIT_Y][EDIT_X+pos]=' ';
-	} else
-	if ( (c>=32) && (c<128) && (pos < max_len) )
-	{
-	    // Символ
-	    text[pos]=c;
-	    ui_scr[EDIT_Y][EDIT_X+pos]=c;
-	    screen.cursor_x++;
-	    pos++;
-	}
+    c=ui_GetKey();
+    if (c==KEY_MENU_ESC)
+    {
+        // Отмена
+        UI_Data.CursorY=99;
+        return 0;
+    } else
+    if ( (c==KEY_MENU_ENTER) && (pos > 0) )
+    {
+        // Сохранение
+        text[pos]=0;
+        UI_Data.CursorY=99;
+        return text;
+    } else
+    if ( (c==KEY_MENU_BACKSPACE) && (pos > 0) )
+    {
+        // Забой
+        UI_Data.CursorX--;
+        pos--;
+        UI_Data.scr[EDIT_Y][EDIT_X+pos]=CPU_koi8_to_zkg(' ');
+    } else
+    if ( (((c>=32) && (c<128)) || ((c>=0xC0) && (c<0x100))) && (pos < max_len) )
+    {
+        // Символ
+        text[pos]=c;
+        UI_Data.scr[EDIT_Y][EDIT_X+pos]=CPU_koi8_to_zkg(c);
+        UI_Data.CursorX++;
+        pos++;
+    }
     }
 }
 
@@ -214,47 +189,35 @@ const char* ui_input_text(const char *comment, const char *_text, uint8_t max_le
 int8_t ui_yes_no(const char *comment)
 {
     ui_clear();
-    ui_header("РАДИО-86РК -->");
-    ui_draw_text(10, 8, comment);
-    ui_draw_text(10, 10, "НЕТ\nДА\n");
-    return ui_select(2);
+    ui_header_default();
+    ui_draw_text(0, 2, comment);
+    ui_draw_list(0, 4, "НЕТ\nДА\n");
+    return ui_select(0, 4, 2);
 }
-
-
-
-
-static struct screen save;
 
 
 void ui_start(void)
 {
-    // Сохраняем параметры экрана
-    save=screen;
-    
-    // Перенастраиваем экран под себя
-    screen.screen_w=80;
-    screen.screen_h=38;
-    screen.underline_y=7;
-    screen.char_h=8;
-    screen.x_offset=4;
-    screen.y_offset=8;
-    screen.attr_visible=0;
-    screen.cursor_x=0;
-    screen.cursor_y=99;
-    screen.cursor_type=0;
-    screen.vram=(uint8_t*)ui_scr;
-    screen.overlay_timer=0;
-    
+    // Сохраняем состояние клавиатуры
+    UI_Data.PrevRusLat = Key_Flags >> KEY_FLAGS_RUSLAT_POS;
+
     // Очищаем экран
     ui_clear();
+
+    // Переключаем экран в режим меню
+    UI_Data.CursorX=0;
+    UI_Data.CursorY=99;
+    UI_Data.Show=1;
 }
 
 
 void ui_stop(void)
 {
+    // Восстанавливаем состояние клавиатуры
+    Key_Flags = (Key_Flags & ~KEY_FLAGS_RUSLAT) | ((UI_Data.PrevRusLat & 1) << KEY_FLAGS_RUSLAT_POS);
+
     // Возвращаем экран на место
-    save.overlay_timer=0;
-    screen=save;
+    UI_Data.Show=0;
 }
 
 
@@ -262,4 +225,33 @@ void ui_sleep(uint16_t ms)
 {
     uint32_t _sleep=getCycleCount()+(ms)*160000;
     while (((uint32_t)(getCycleCount() - _sleep)) & 0x80000000);
+}
+
+uint_fast16_t ui_GetKey (void)
+{
+    uint_fast16_t CodeAndFlags;
+    uint_fast16_t Key;
+
+    ps2_periodic ();
+
+    CodeAndFlags = ps2_read ();
+
+    if (CodeAndFlags == 0) return 0;
+
+    if (CodeAndFlags == PS2_DELETE) return KEY_MENU_DELETE;
+
+    Key = Key_Translate (CodeAndFlags | KEY_TRANSLATE_UI);
+
+    ps2_leds ((Key_Flags >> KEY_FLAGS_CAPSLOCK_POS) & 1, (Key_Flags >> KEY_FLAGS_NUMLOCK_POS) & 1, (Key_Flags >> KEY_FLAGS_TURBO_POS) & 1);
+
+    if ((CodeAndFlags & 0x8000U) || (Key == KEY_UNKNOWN)) return 0;
+
+    if      (Key == 14) Key_SetRusLat ();
+    else if (Key == 15) Key_ClrRusLat ();
+
+//  Key &= ~KEY_AR2_PRESSED;
+
+    if ((Key_Flags & KEY_FLAGS_RUSLAT) && (Key & 0x40)) Key ^= 0x80;
+
+    return Key;
 }

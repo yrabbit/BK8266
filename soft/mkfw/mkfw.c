@@ -42,8 +42,8 @@ int read(uint8_t *buf, const char *fname, int max_size)
     FILE *f=fopen(fname, "rb");
     if (!f)
     {
-	perror(fname);
-	return 0;
+    perror(fname);
+    return 0;
     }
     fread(buf, 1, max_size, f);
     fclose(f);
@@ -51,8 +51,8 @@ int read(uint8_t *buf, const char *fname, int max_size)
 }
 
 
-#define FW	"0x00000.bin"
-#define UPDATE	"fota.bin"
+#define FW  "0x00000.bin"
+#define UPDATE  "fota.bin"
 
 
 int main()
@@ -72,7 +72,7 @@ int main()
     if (! read(data+0x10000, "../WiFiAPP/out/wifi.1.bin", 0x60000)) return -1;
     
     // Читаем справку
-    if (! read(data+0x50000, "../help/help.bin", 0x10000)) return -1;
+    if (! read(data+0x50000, "../EmuAPP/ROM/rom.bin", 0x8000)) return -1;
     
     // Читаем файловую систему HTTP
     if (! read(data+0x70000, "../WiFiAPP/httpfs/httpfs.bin", 0xC000)) return -1;
@@ -82,15 +82,15 @@ int main()
     f=fopen(FW, "wb");
     if (!f)
     {
-	perror(FW);
-	return -1;
+    perror(FW);
+    return -1;
     }
     fwrite(data, 1, sizeof(data), f);
     fclose(f);
     
     
     // Заполняем заголовок
-    memset(data, 0x00, 0x1000);	// вместо загрузчика будет заголовок для обновления
+    memset(data, 0x00, 0x1000); // вместо загрузчика будет заголовок для обновления
     memcpy(hdr->magic, "FWUPDATE", 8);
     hdr->size4k=0x7B;
     hdr->reserved1=0;
@@ -101,15 +101,15 @@ int main()
     int i;
     for (i=0; i<hdr->size4k; i++)
     {
-	crcdata[i]=CRC16(0xFFFF, data+0x1000+i*0x1000, 0x1000);
+    crcdata[i]=CRC16(0xFFFF, data+0x1000+i*0x1000, 0x1000);
     }
     
     // Сохраняем обновление
     f=fopen(UPDATE, "wb");
     if (!f)
     {
-	perror(UPDATE);
-	return -1;
+    perror(UPDATE);
+    return -1;
     }
     fwrite(data, 1, sizeof(data), f);
     fclose(f);

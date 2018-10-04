@@ -48,9 +48,12 @@ void CPU_Init           (void);
 void CPU_RunInstruction (void);
 void CPU_Stop           (void);
 void CPU_TimerRun       (void);
+char CPU_koi8_to_zkg    (char);
 
 #define MEM8  ((uint8_t  *) 0x3FFE8000)
 #define MEM16 ((uint16_t *) 0x3FFE8000)
 #define MEM32 ((uint32_t *) 0x3FFE8000)
+
+#define CPU_ZKG_OFFSET 0x94BE // (соответствует пробелу)
 
 #endif

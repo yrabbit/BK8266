@@ -5,7 +5,7 @@
 #include "ets.h"
 
 
-int16_t fileman(uint8_t type, const char *text);
+int_fast16_t fileman (uint8_t type, uint_fast8_t Mode);
 
 
 #endif

@@ -30,6 +30,9 @@ C_SOURCES+= \
 	src/Key.c		\
 	src/UTF8_KOI8.c \
 	src/spi_flash.c \
+	src/ui.c		\
+	src/menu.c		\
+	src/fileman.c	\
 
 
 ##############################################################################
@@ -76,7 +79,7 @@ all: $(OUTDIR)/$(OUT)-0x00000.bin
 
 $(OUTDIR)/$(OUT)-0x00000.bin: $(OUTDIR)/$(OUT)
 	@echo "Making $(OUT).bin..."; \
-	$(ESPTOOL2) -quiet -bin -boot0 -4096 -qio -40 $^ $@ .text .data .rodata .bkrom.data
+	$(ESPTOOL2) -quiet -bin -boot0 -4096 -qio -40 $^ $@ .text .data .rodata
 
 # Target for linker
 $(OUTDIR)/$(OUT): $(subst $(SRCDIR)/,$(OBJDIR)/$(SRCDIR)/,$(C_SOURCES:.c=.o))

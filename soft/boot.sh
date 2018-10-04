@@ -11,7 +11,3 @@ cd ..
 cd WiFiAPP
 make || exit
 cd ..
-
-cd help
-./mkhelp || exit
-cd ..
