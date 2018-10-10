@@ -296,12 +296,16 @@ void main_program(void)
                     }
                     else
                     {
-                        MEM16 [0177716 >> 1] &= ~0100;
+                        LastKey  = ((uint_fast32_t) Key << 16) | CodeAndFlags;
 
-                        LastKey = ((uint_fast32_t) Key << 16) | CodeAndFlags;
+                        RunState = 6;
                     }
                 }
                 break;
+
+            case 6:
+
+                MEM16 [0177716 >> 1] &= ~0100;
 
             case 5:
 
@@ -331,6 +335,9 @@ void main_program(void)
                     MEM16 [0177660 >> 1] |= 0200;
                     MEM16 [0177662 >> 1]  = (uint16_t) Key & 0177;
                 }
+
+                RunState = 0;
+
                 break;
         }
     }
