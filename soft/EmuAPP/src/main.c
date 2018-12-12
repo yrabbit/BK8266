@@ -16,167 +16,217 @@
 #include "CPU.h"
 #include "Key.h"
 
-static void TapeOp (void)
+union
+{
+    uint32_t U32 [64];
+    uint16_t U16 [64 * 2];
+    uint8_t  U8  [64 * 4];
+
+} TapeBuf;
+
+#define CPU_CHECK_ARG_FAULT( Arg) {if (CPU_IS_ARG_FAULT (Arg)) goto BusFault;}
+
+static void TapeReadOp (void)
+{
+    uint_fast16_t ParamAdr = MEM16 [0306 >> 1];
+    uint_fast16_t Addr     = 01000;
+    uint_fast16_t Size     = 01000;
+    int           iFile;
+    uint_fast16_t Offset;
+    uint_fast32_t CheckSum;
+    uint_fast16_t Count;
+    TCPU_Arg      Arg;
+
+    MEM16 [0304 >> 1] = 1;
+
+    for (Count = 0; Count < 16; Count++)
+    {
+        Arg = CPU_ReadMemB ((ParamAdr + 6 + Count) & 0xFFFFU);
+
+        CPU_CHECK_ARG_FAULT (Arg);
+
+        TapeBuf.U8 [Count] = (uint8_t) Arg;
+    }
+
+    ffs_cvt_name ((char *) &TapeBuf.U8 [0], (char *) &TapeBuf.U8 [16]);
+
+    if (TapeBuf.U8 [16] == 0)
+    {
+        ui_start();
+        iFile = menu_fileman (1);
+        ui_stop();
+
+        if (iFile >= 0)
+        {
+            ets_memcpy (&TapeBuf.U8 [0], ffs_name ((uint16_t) iFile), 16);
+            for (Count = 0; (Count < 16) && (TapeBuf.U8 [Count] != 0); Count++);
+            for (;          (Count < 16);                              Count++) TapeBuf.U8 [Count] = ' ';
+        }
+    }
+    else
+    {
+        iFile = ffs_find ((char *) &TapeBuf.U8 [16]);
+    }
+
+    if (iFile < 0)
+    {
+        ets_memset (&TapeBuf.U8 [0], ' ', 16);
+        MEM8 [0301] = 1;
+    }
+    else if (fat [iFile].size < 4)
+    {
+        MEM8 [0301] = 2;
+    }
+    else
+    {
+        ffs_read ((uint16_t) iFile, 0, (uint8_t *) &TapeBuf.U16 [8], 4);
+        Addr = TapeBuf.U16 [8];
+        Size = TapeBuf.U16 [9];
+
+        if ((uint_fast32_t) Size + 4 > fat [iFile].size)
+        {
+            MEM8 [0301] = 2;
+        }
+    }
+
+    CPU_CHECK_ARG_FAULT (CPU_WriteMemW ((ParamAdr + 22) & 0xFFFFU, Addr));
+    CPU_CHECK_ARG_FAULT (CPU_WriteMemW ((ParamAdr + 24) & 0xFFFFU, Size));
+
+    for (Count = 0; Count < 16; Count++)
+    {
+        CPU_CHECK_ARG_FAULT (CPU_WriteMemB ((ParamAdr + 26 + Count) & 0xFFFFU, TapeBuf.U8 [Count]));
+    }
+
+    if (MEM8 [0301]) goto Exit;
+
+                   Arg = CPU_ReadMemW ((ParamAdr + 24) & 0xFFFFU); CPU_CHECK_ARG_FAULT (Arg);   MEM16 [0266 >> 1] = Arg;
+                   Arg = CPU_ReadMemW ((ParamAdr +  2) & 0xFFFFU); CPU_CHECK_ARG_FAULT (Arg);
+    if (Arg == 0) {Arg = CPU_ReadMemW ((ParamAdr + 22) & 0xFFFFU); CPU_CHECK_ARG_FAULT (Arg);}  MEM16 [0264 >> 1] = Arg;
+
+    Addr     = MEM16 [0264 >> 1];
+    Size     = MEM16 [0266 >> 1];
+    CheckSum = 0;
+    Offset   = 4;
+
+    while (Size)
+    {
+        uint_fast16_t TempSize;
+
+        TempSize = Size;
+        if (TempSize > sizeof (TapeBuf) / sizeof (uint8_t)) TempSize = sizeof (TapeBuf) / sizeof (uint8_t);
+
+        ffs_read ((uint16_t) iFile, Offset, &TapeBuf.U8 [0], sizeof (TapeBuf));
+
+        for (Count = 0; Count < TempSize; Count++)
+        {
+            CheckSum += (uint_fast32_t) TapeBuf.U8 [Count];
+            Arg = CPU_WriteMemB (Addr, TapeBuf.U8 [Count]);
+            Addr = (Addr + 1) & 0xFFFFU;
+            CPU_CHECK_ARG_FAULT (Arg);
+        }
+
+        Offset += TempSize;
+        Size   -= TempSize;
+    }
+
+    CheckSum = (CheckSum & 0xFFFFU) + (CheckSum >> 16);
+    CheckSum = (CheckSum & 0xFFFFU) + (CheckSum >> 16);
+    MEM16 [0312 >> 1] = (uint16_t) CheckSum;
+    Device_Data.CPU_State.r [5] = Addr;
+
+Exit:
+
+    Device_Data.CPU_State.r [7] = 0116232;
+    return;
+
+BusFault:
+
+    Device_Data.CPU_State.r [7] = MEM16 [04 >> 1];
+    Device_Data.CPU_State.psw   = MEM16 [06 >> 1];
+}
+
+static void TapeWriteOp (void)
 {
     uint_fast16_t ParamAdr = Device_Data.CPU_State.r [1];
-    uint_fast8_t  Cmd      = MEM8  [ ParamAdr          ];
-    uint_fast16_t Addr     = MEM16 [(ParamAdr + 2) >> 1];
-    uint_fast16_t Size     = MEM16 [(ParamAdr + 4) >> 1];
+    int           iFile    = -1;
+    uint_fast32_t CheckSum;
+    TCPU_Arg      Arg;
+    uint_fast16_t Addr;
+    uint_fast16_t Size;
+    uint_fast16_t offs;
+    uint_fast16_t Count;
+    uint_fast8_t  FirstOffs;
 
-    static uint32_t Buf [64];
+    Arg = CPU_ReadMemW (ParamAdr + 2); CPU_CHECK_ARG_FAULT (Arg); Addr = Arg;
+    Arg = CPU_ReadMemW (ParamAdr + 4); CPU_CHECK_ARG_FAULT (Arg); Size = Arg;
 
-    ets_memcpy (Buf, &MEM8 [ParamAdr + 6], 16);
-
-    Buf [4] = 0;
-
-    ffs_cvt_name ((char *) &Buf [0], (char *) &Buf [0]);
-
-    if (Cmd == 3)
+    for (Count = 0; Count < 16; Count++)
     {
-        int iFile;
+        Arg = CPU_ReadMemB ((ParamAdr + 6 + Count) & 0xFFFFU);
 
-        if (((char *) &Buf [0]) [0] == 0)
-        {
-            ui_start();
-            iFile = menu_fileman (1);
-            ui_stop();
-        }
-        else
-        {
-            iFile = ffs_find ((char *) &Buf [0]);
-        }
+        CPU_CHECK_ARG_FAULT (Arg);
 
-        if (iFile < 0)
-        {
-            Addr = 0;
-            MEM8 [ParamAdr + 1] = 2;
-        }
-        else
-        {
-            uint_fast16_t Offset;
-            // ffs_read (uint16_t n, uint16_t offs, uint8_t *data, uint16_t size)
-
-            ffs_read ((uint16_t) iFile, 0, (uint8_t *) &Buf [0], 4);
-
-            if (Addr == 0) Addr = ((uint16_t *) &Buf [0]) [0];
-            Size = ((uint16_t *) &Buf [0]) [1];
-
-            if (((uint_fast32_t) Addr + Size) > 0100000)
-            {
-                Addr = 0;
-                MEM8 [ParamAdr + 1] = 2;
-            }
-            else
-            {
-                MEM8  [ParamAdr + 1] = 0;
-                MEM16 [0264 >> 1   ] = Addr;
-                MEM16 [0266 >> 1   ] = Size;
-                MEM16 [(ParamAdr + 026) >> 1] = Addr;
-                MEM16 [(ParamAdr + 030) >> 1] = Size;
-
-                Offset = 4;
-
-                while (Size)
-                {
-                    ffs_read ((uint16_t) iFile, Offset, (uint8_t *) &Buf [0], sizeof (Buf));
-
-                    if (Size >= sizeof (Buf)) {ets_memcpy (&MEM8 [Addr], Buf, sizeof (Buf)); Addr += sizeof (Buf); Size -= sizeof (Buf);}
-                    else                      {ets_memcpy (&MEM8 [Addr], Buf,         Size); Addr += Size; break;}
-
-                    Offset += sizeof (Buf);
-                }
-
-                ets_memcpy (&MEM8 [ParamAdr + 032], ffs_name ((uint16_t) iFile), 16);
-
-                {
-                    int Count;
-
-                    for (Count = 0; (Count < 16) && (MEM8 [ParamAdr + 032 + Count] != 0); Count++);
-                    for (;          (Count < 16);                                         Count++) MEM8 [ParamAdr + 032 + Count] = ' ';
-                }
-            }
-        }
-
-        Device_Data.CPU_State.r [5] = Addr;
-        Device_Data.CPU_State.r [7] = MEM16 [Device_Data.CPU_State.r [6] >> 1];
-        Device_Data.CPU_State.r [6] += 2;
+        TapeBuf.U8 [Count] = (uint8_t) Arg;
     }
-    else if (Cmd == 2) // Сохранение файла
+
+    ffs_cvt_name ((char *) &TapeBuf.U8 [0], (char *) &TapeBuf.U8 [0]);
+    
+    if (ffs_find ((char *) &TapeBuf.U8 [0]) >= 0) goto BusFault; // Файл уже существует
+
+    // Создаем файл
+    iFile = ffs_create ((char *) &TapeBuf.U8 [0], TYPE_TAPE, Size + sizeof (uint32_t));
+
+    if (iFile < 0) goto BusFault; // Файл не создался
+
+    TapeBuf.U16 [0] = Addr;
+    TapeBuf.U16 [1] = Size;
+    FirstOffs       = 4;
+    offs            = 0;
+    CheckSum        = 0;
+
+    while (Size)
     {
-        if (((uint_fast32_t) Addr + Size) > 0100000)
+        uint_fast16_t RdSize;
+        uint_fast16_t WrSize;
+        uint8_t       *pBuf;
+
+        pBuf   = &TapeBuf.U8 [FirstOffs];
+        RdSize = sizeof (TapeBuf) / sizeof (uint8_t) - FirstOffs;
+        if (RdSize > Size) RdSize = Size;
+        WrSize = (RdSize + FirstOffs + 3) & ~3U;
+        FirstOffs = 0;
+
+        for (Count = 0; Count < RdSize; Count++)
         {
-            MEM8 [ParamAdr + 1] = 2;
-        }
-        else
-        {
-            int iFile = ffs_find ((char *) &Buf [0]);
-
-            if (iFile >= 0) // Файл уже существует
-            {
-                MEM8 [ParamAdr + 1] = 2;
-            }
-            else
-            {
-                // Создаем файл
-                iFile = ffs_create ((char *) &Buf [0], TYPE_TAPE, Size + sizeof (uint32_t));
-
-                if (iFile < 0) // Файл не создался
-                {
-                    MEM8 [ParamAdr + 1] = 2;
-                }
-                else
-                {
-                    uint_fast16_t offs = sizeof (Buf) - sizeof (uint32_t);
-
-                    MEM8  [ParamAdr + 1] = 0;
-                    MEM16 [0264 >> 1   ] = Addr;
-                    MEM16 [0266 >> 1   ] = Size;
-                    MEM16 [(ParamAdr + 026) >> 1] = Addr;
-                    MEM16 [(ParamAdr + 030) >> 1] = Size;
-
-                    ets_memcpy (&MEM8 [ParamAdr + 032], ffs_name ((uint16_t) iFile), 16);
-
-                    ((uint16_t *) &Buf [0]) [0] = Addr;
-                    ((uint16_t *) &Buf [0]) [1] = Size;
-
-                    if (Size > sizeof (Buf) - sizeof (uint32_t))
-                    {
-                        ets_memcpy (&Buf [1], &MEM8 [Addr], sizeof (Buf) - sizeof (uint32_t));
-                        Size -= sizeof (Buf) - sizeof (uint32_t);
-                        Addr += sizeof (Buf) - sizeof (uint32_t);
-                    }
-                    else
-                    {
-                        ets_memcpy (&Buf [1], &MEM8 [Addr], Size);
-                        Size = 0;
-                    }
-                    ffs_writeData (iFile, 0, (uint8_t *) &Buf [0], sizeof (Buf));
-
-                    while (Size)
-                    {
-                        if (Size > sizeof (Buf))
-                        {
-                            ets_memcpy (Buf, &MEM8 [Addr], sizeof (Buf));
-                            Size -= sizeof (Buf);
-                            Addr += sizeof (Buf);
-                        }
-                        else
-                        {
-                            ets_memcpy (Buf, &MEM8 [Addr], Size);
-                            Size = 0;
-                        }
-
-                        ffs_writeData (iFile, offs, (uint8_t *) &Buf [0], sizeof (Buf));
-                        offs += sizeof (Buf);
-                    }
-                }
-            }
+            Arg = CPU_ReadMemB (Addr);
+            Addr = (Addr + 1) & 0xFFFFU;
+            CPU_CHECK_ARG_FAULT (Arg);
+            *pBuf++   = (uint8_t)       Arg;
+            CheckSum += (uint_fast32_t) Arg;
         }
 
-        Device_Data.CPU_State.r [7] = MEM16 [Device_Data.CPU_State.r [6] >> 1];
-        Device_Data.CPU_State.r [6] += 2;
+        ffs_writeData (iFile, offs, &TapeBuf.U8 [0], WrSize);
+
+        offs += WrSize;
+        Size -= RdSize;
     }
+
+    CheckSum = (CheckSum & 0xFFFFU) + (CheckSum >> 16);
+    CheckSum = (CheckSum & 0xFFFFU) + (CheckSum >> 16);
+    MEM16 [0312 >> 1] = (uint16_t) CheckSum;
+
+    Device_Data.CPU_State.r [7] = 0116232;
+    return;
+
+BusFault:
+
+    if (iFile >= 0) ffs_remove (iFile);
+
+    Device_Data.CPU_State.r [7] = MEM16 [04 >> 1];
+    Device_Data.CPU_State.psw   = MEM16 [06 >> 1];
 }
+
+#undef CPU_CHECK_ARG_FAULT
 
 void main_program(void)
 {
@@ -212,7 +262,13 @@ void main_program(void)
             {
                 CPU_RunInstruction ();
 
-                if (Device_Data.CPU_State.r [7] == 0116076) TapeOp ();
+                if (Device_Data.CPU_State.r [7] == 0116142) // 0116076
+                {
+                    uint_fast16_t Cmd = Device_Data.CPU_State.r [0];
+
+                    if      (Cmd == 3) TapeReadOp  ();
+                    else if (Cmd == 2) TapeWriteOp ();
+                }
             }
 
             Time = getCycleCount ();
@@ -232,12 +288,12 @@ void main_program(void)
                 Time += (uint32_t) (NewT - T) * 53;
                 T     = NewT;
 
-                if (Device_Data.CPU_State.r [7] == 0116076)
+                if (Device_Data.CPU_State.r [7] == 0116142) // 0116076
                 {
-                    TapeOp ();
+                    uint_fast16_t Cmd = Device_Data.CPU_State.r [0];
 
-                    Time = getCycleCount ();
-                    T    = Device_Data.CPU_State.Time;
+                    if      (Cmd == 3) {TapeReadOp  (); Time = getCycleCount (); T = Device_Data.CPU_State.Time;}
+                    else if (Cmd == 2) {TapeWriteOp (); Time = getCycleCount (); T = Device_Data.CPU_State.Time;}
                 }
             }
 

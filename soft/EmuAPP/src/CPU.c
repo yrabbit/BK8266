@@ -12,15 +12,6 @@ TDevice_Data Device_Data;
 //uint16_t __attribute__((section(".bkram.bss" ))) bkram [0100000 >> 1];
 //uint16_t __attribute__((section(".bkrom.data"))) bkrom [0100000 >> 1];
 
-#define  CPU_ARG_REG        0x40000000UL
-#define  CPU_ARG_FAULT      0x80000000UL
-#define  CPU_ARG_WRITE_OK   0
-#define  CPU_ARG_WRITE_ERR  CPU_ARG_FAULT
-#define  CPU_ARG_READ_ERR   CPU_ARG_FAULT
-
-#define  CPU_IS_ARG_FAULT(        Arg) (Arg &  CPU_ARG_FAULT)
-#define  CPU_IS_ARG_REG(          Arg) (Arg &  CPU_ARG_REG)
-#define  CPU_IS_ARG_FAULT_OR_REG( Arg) (Arg & (CPU_ARG_FAULT | CPU_ARG_REG))
 #define  CPU_GET_ARG_REG_INDEX(   Arg) (Arg & 7)
 
 #define R     Device_Data.CPU_State.r
@@ -187,10 +178,8 @@ void CPU_TimerRun (void)
     }
 }
 
-static TCPU_Arg CPU_ReadW (TCPU_Arg Adr)
+TCPU_Arg CPU_ReadMemW (TCPU_Arg Adr)
 {
-    if (CPU_IS_ARG_REG (Adr)) return R [CPU_GET_ARG_REG_INDEX (Adr)];
-
     if (Adr < 0177600) return MEM16 [Adr >> 1];
 
     switch (Adr >> 1)
@@ -210,10 +199,8 @@ static TCPU_Arg CPU_ReadW (TCPU_Arg Adr)
     return MEM16 [Adr >> 1];
 }
 
-static TCPU_Arg CPU_ReadB (TCPU_Arg Adr)
+TCPU_Arg CPU_ReadMemB (TCPU_Arg Adr)
 {
-    if (CPU_IS_ARG_REG (Adr)) return (*(uint8_t *) &R [CPU_GET_ARG_REG_INDEX (Adr)]);
-
     if (Adr < 0177600) return MEM8 [Adr];
 
     switch (Adr >> 1)
@@ -233,12 +220,21 @@ static TCPU_Arg CPU_ReadB (TCPU_Arg Adr)
     return MEM8 [Adr];
 }
 
-static TCPU_Arg CPU_ReadMemW (TCPU_Arg Adr)
+static TCPU_Arg CPU_ReadW (TCPU_Arg Adr)
 {
-    return MEM16 [Adr >> 1];
+    if (CPU_IS_ARG_REG (Adr)) return R [CPU_GET_ARG_REG_INDEX (Adr)];
+
+    return CPU_ReadMemW (Adr);
 }
 
-static TCPU_Arg CPU_WriteW (TCPU_Arg Adr, uint_fast16_t Word)
+static TCPU_Arg CPU_ReadB (TCPU_Arg Adr)
+{
+    if (CPU_IS_ARG_REG (Adr)) return (*(uint8_t *) &R [CPU_GET_ARG_REG_INDEX (Adr)]);
+
+    return CPU_ReadMemB (Adr);
+}
+
+TCPU_Arg CPU_WriteW (TCPU_Arg Adr, uint_fast16_t Word)
 {
     uint_fast16_t PrevWord;
 
@@ -331,9 +327,7 @@ static TCPU_Arg CPU_WriteW (TCPU_Arg Adr, uint_fast16_t Word)
     return CPU_ARG_WRITE_OK;
 }
 
-#define CPU_WriteMemW CPU_WriteW
-
-static uint_fast8_t CPU_WriteB (TCPU_Arg Adr, uint_fast8_t Byte)
+TCPU_Arg CPU_WriteB (TCPU_Arg Adr, uint_fast8_t Byte)
 {
     uint_fast16_t Word;
     uint_fast16_t PrevWord;
@@ -430,6 +424,9 @@ static uint_fast8_t CPU_WriteB (TCPU_Arg Adr, uint_fast8_t Byte)
 
     return CPU_ARG_WRITE_OK;
 }
+
+#define CPU_WriteMemW CPU_WriteW
+#define CPU_WriteMemB CPU_WriteB
 
 static TCPU_Arg CPU_GetArgAdrW (uint_fast8_t SrcCode)
 {
