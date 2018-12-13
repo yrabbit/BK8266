@@ -13,6 +13,7 @@ extern "C" {
 
 void ps2_init(void);
 uint16_t ps2_read(void);
+void ps2_leds(bool caps, bool num, bool scroll);
 
 
 #ifdef __cplusplus
