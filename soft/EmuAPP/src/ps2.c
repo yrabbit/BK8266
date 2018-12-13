@@ -23,7 +23,7 @@ static bool ack=0, resend=0, bat=0;
 static struct pt pt_task;
 
 
-static void gpio_int(void *arg)
+void gpio_int(void *arg)
 {
     static uint16_t rx=0, rxbit=1;
     static bool was_E0=0, was_E1=0, was_F0=0;

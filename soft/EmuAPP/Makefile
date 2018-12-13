@@ -12,6 +12,10 @@
 ##  Source files with paths
 ##############################################################################
 
+ASM_SOURCES+= \
+	src/IntVectors.s \
+
+
 C_SOURCES+= \
 	src/startup.c	\
 	src/timer0.c	\
@@ -82,9 +86,9 @@ $(OUTDIR)/$(OUT)-0x00000.bin: $(OUTDIR)/$(OUT)
 	$(ESPTOOL2) -quiet -bin -boot0 -4096 -qio -40 $^ $@ .text .data .rodata
 
 # Target for linker
-$(OUTDIR)/$(OUT): $(subst $(SRCDIR)/,$(OBJDIR)/$(SRCDIR)/,$(C_SOURCES:.c=.o))
+$(OUTDIR)/$(OUT): $(subst $(SRCDIR)/,$(OBJDIR)/$(SRCDIR)/,$(C_SOURCES:.c=.o)) $(subst $(SRCDIR)/,$(OBJDIR)/$(SRCDIR)/,$(ASM_SOURCES:.s=.o)) 
 	@echo "Linking..."; \
-	$(CC) $(CFLAGS) -o $@ -Wl,-Map,$(OUTDIR)/$(OUT).map $(subst $(SRCDIR)/,$(OBJDIR)/$(SRCDIR)/,$(C_SOURCES:.c=.o)) -T$(LD_SCRIPT) $(LDFLAGS)
+	$(CC) $(CFLAGS) -o $@ -Wl,-Map,$(OUTDIR)/$(OUT).map $(subst $(SRCDIR)/,$(OBJDIR)/$(SRCDIR)/,$(C_SOURCES:.c=.o)) $(subst $(SRCDIR)/,$(OBJDIR)/$(SRCDIR)/,$(ASM_SOURCES:.s=.o)) -T$(LD_SCRIPT) $(LDFLAGS)
 
 # Target for clean
 clean:
@@ -117,6 +121,10 @@ $(DEPDIR)/%.d: %.c
 
 # Rule for compiling C files
 $(OBJDIR)/%.o: %.c
+	@echo "Compiling $<"; \
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(OBJDIR)/%.o: %.s
 	@echo "Compiling $<"; \
 	$(CC) $(CFLAGS) -c -o $@ $<
 

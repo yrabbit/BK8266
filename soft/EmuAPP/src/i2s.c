@@ -181,7 +181,7 @@ static i2s_cb_t i2s_cb;
 //void rom_i2c_writeReg_Mask(int, int, int, int, int, int);
 
 
-static void i2s_int(void)
+void i2s_int(void)
 {
     // Get INT status
     uint32_t slc_intr_status = READ_PERI_REG(SLC_INT_STATUS);

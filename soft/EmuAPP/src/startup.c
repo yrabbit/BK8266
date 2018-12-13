@@ -14,6 +14,7 @@ static void my_putc1(char c)
 #endif
 }
 
+void InitVecBase (void);
 
 void call_user_start(void)
 {
@@ -42,7 +43,9 @@ void call_user_start(void)
     // Заменяем обработчик putc1
 //#warning !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     ets_install_putc1((void*)my_putc1);
-    
+
+    // Меняем менеджер прерываний на свой, реетерабельный с приоритетами. Прерывания в порядке убывания приоритета: Timer, I2S, GPIO.
+    InitVecBase ();
     
     // Запускаем основную программу
     main_program();
