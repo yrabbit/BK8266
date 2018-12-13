@@ -56,12 +56,11 @@ static void TapeReadOp (void)
         iFile = menu_fileman (1);
         ui_stop();
 
-        if (iFile >= 0)
-        {
-            ets_memcpy (&TapeBuf.U8 [0], ffs_name ((uint16_t) iFile), 16);
-            for (Count = 0; (Count < 16) && (TapeBuf.U8 [Count] != 0); Count++);
-            for (;          (Count < 16);                              Count++) TapeBuf.U8 [Count] = ' ';
-        }
+        if (iFile < 0) goto BusFault;
+
+        ets_memcpy (&TapeBuf.U8 [0], ffs_name ((uint16_t) iFile), 16);
+        for (Count = 0; (Count < 16) && (TapeBuf.U8 [Count] != 0); Count++);
+        for (;          (Count < 16);                              Count++) TapeBuf.U8 [Count] = ' ';
     }
     else
     {
@@ -70,8 +69,8 @@ static void TapeReadOp (void)
 
     if (iFile < 0)
     {
-        ets_memset (&TapeBuf.U8 [0], ' ', 16);
-        MEM8 [0301] = 1;
+//      ets_memcpy (&TapeBuf.U8 [0], "FILE NOT FOUND  ", 16);
+        MEM8 [0301] = 2;
     }
     else if (fat [iFile].size < 4)
     {
@@ -365,31 +364,34 @@ void main_program(void)
 
             case 5:
 
-                if (((MEM16 [0177660 >> 1] & 0200) | (LastKey & 0x800)) == 0)
+                if ((LastKey & 0x800) == 0)
                 {
-                    Key = (uint_fast16_t) (LastKey >> 16);
-
-                    LastKey |= 0x800;
-
-                    if      (Key == 14) Key_SetRusLat ();
-                    else if (Key == 15) Key_ClrRusLat ();
-
-                    if ((MEM16 [0177660 >> 1] & 0100) == 0)
+                    if ((MEM16 [0177660 >> 1] & 0200) == 0)
                     {
-                        if (Key & KEY_AR2_PRESSED)
+                        Key = (uint_fast16_t) (LastKey >> 16);
+
+                        if      (Key == 14) Key_SetRusLat ();
+                        else if (Key == 15) Key_ClrRusLat ();
+
+                        if ((MEM16 [0177660 >> 1] & 0100) == 0)
                         {
-                            Device_Data.CPU_State.Flags &= ~CPU_FLAG_KEY_VECTOR_60;
-                            Device_Data.CPU_State.Flags |=  CPU_FLAG_KEY_VECTOR_274;
+                            if (Key & KEY_AR2_PRESSED)
+                            {
+                                Device_Data.CPU_State.Flags &= ~CPU_FLAG_KEY_VECTOR_60;
+                                Device_Data.CPU_State.Flags |=  CPU_FLAG_KEY_VECTOR_274;
+                            }
+                            else
+                            {
+                                Device_Data.CPU_State.Flags &= ~CPU_FLAG_KEY_VECTOR_274;
+                                Device_Data.CPU_State.Flags |=  CPU_FLAG_KEY_VECTOR_60;
+                            }
                         }
-                        else
-                        {
-                            Device_Data.CPU_State.Flags &= ~CPU_FLAG_KEY_VECTOR_274;
-                            Device_Data.CPU_State.Flags |=  CPU_FLAG_KEY_VECTOR_60;
-                        }
+
+                        MEM16 [0177660 >> 1] |= 0200;
                     }
 
-                    MEM16 [0177660 >> 1] |= 0200;
-                    MEM16 [0177662 >> 1]  = (uint16_t) Key & 0177;
+                    LastKey |= 0x800;
+                    MEM16 [0177662 >> 1] = (uint16_t) (LastKey >> 16) & 0177;
                 }
 
                 RunState = 0;
