@@ -44,13 +44,14 @@ DEPDIR=.dep
 ##############################################################################
 ##  Compiler information
 ##############################################################################
-CC="$(GCCESP8266PATH)\xtensa-lx106-elf-gcc.exe"
+CC="$(GCCESP8266PATH)/xtensa-lx106-elf-gcc"
 INCLUDES=-I$(SRCDIR)
 CFLAGS=-Os -Wall -Wl,-EL -fno-inline-functions -nostdlib -mlongcalls -mtext-section-literals  -D__ets__ -DICACHE_FLASH $(INCLUDES)
 LIBS=
 LD_SCRIPT=$(SRCDIR)/eagle.app.v6.ld
 LDFLAGS=-nostdlib -Wl,--no-check-sections -u call_user_start -Wl,-static $(LIBS)
-ESPTOOL2=$(PRJROOT)/Utils/esptool2/V2.0.0/esptool2.exe
+#ESPTOOL2=$(PRJROOT)/Utils/esptool2/V2.0.0/esptool2.exe
+ESPTOOL2=${HOME}/src/esptool2/esptool2
 ##############################################################################
 
 

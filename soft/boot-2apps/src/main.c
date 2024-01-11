@@ -17,37 +17,39 @@ uint32_t main_program(void)
             rom_i2c_writeReg(103,4,2,0x91);
         }
     }
-    
+
     // Инитим UART на 115200
     uart_div_modify(0, 80000000/115200);
     ets_delay_us(100000);
-    
+
     ets_printf("\r\nRK8266 Boot\r\n");
-    
+
     // Если надо - обновляем прошивку
     fw_update();
-    
+
     // Проверяем - какую программу надо запустить
     if (READ_PERI_REG(0x60001200) != 0x55AA55AA)
     {
 	// Эмулятор
-	
+
+    ets_printf("Emu\r\n");
 	// Отключаем кэш, это дает +32кб IRAM
 	CLEAR_PERI_REG_MASK(0x3ff00024, 0x00000018);
-	
+
 	runAddr=check_image(0x01000);
     } else
     {
 	// WiFi
+    ets_printf("WiFi\r\n");
 	runAddr=check_image(0x10000);
     }
-    
+
     if (runAddr==0)
     {
 	ets_printf("BAD ROM !!!\r\n");
 	return 0;
     }
-    
+
     ets_printf("Booting rom...\r\n");
     // copy the loader to top of iram
     ets_memcpy((void*)_text_addr, _text_data, _text_len);

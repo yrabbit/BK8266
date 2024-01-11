@@ -65,14 +65,15 @@ DEPDIR=.dep
 ##############################################################################
 BUILD_NUMBER=$(shell git rev-list --count HEAD)
 
-CC="$(GCCESP8266PATH)\xtensa-lx106-elf-gcc.exe"
+CC="$(GCCESP8266PATH)/xtensa-lx106-elf-gcc"
 INCLUDES=-I$(SRCDIR)
 CFLAGS=-O3 -g -Wall -Wl,-EL -fno-inline-functions -nostdlib -mlongcalls -mtext-section-literals -D__ets__ $(INCLUDES)
 LIBS=-lgcc
 LD_SCRIPT=ld/eagle.app.v6.ld
 LDFLAGS_BUILD_NUMBER=-Xlinker --defsym -Xlinker __BUILD_NUMBER__=$(BUILD_NUMBER)
 LDFLAGS=-nostdlib -Wl,--no-check-sections -u call_user_start -Wl,-static $(LIBS) $(LDFLAGS_BUILD_NUMBER)
-ESPTOOL2=$(PRJROOT)/Utils/esptool2/V2.0.0/esptool2.exe
+#ESPTOOL2=$(PRJROOT)/Utils/esptool2/V2.0.0/esptool2.exe
+ESPTOOL2=${HOME}/src/esptool2/esptool2
 ##############################################################################
 
 

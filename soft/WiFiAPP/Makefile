@@ -51,13 +51,14 @@ DEPDIR=.dep
 ##############################################################################
 ##  Compiler information
 ##############################################################################
-SDK=../../../../Modules/SDK/ESP8266/NONOS_SDK_BY_HEAVY_v1.5.3
+#SDK=../../../../Modules/SDK/ESP8266/NONOS_SDK_BY_HEAVY_v1.5.3
+SDK=/opt/esp/esp_iot_sdk_v1.5.3
 BUILD_NUMBER=$(shell git rev-list --count HEAD)
 
-CC="$(GCCESP8266PATH)\xtensa-lx106-elf-gcc.exe"
-CPP="$(GCCESP8266PATH)\xtensa-lx106-elf-g++.exe"
-OBJCOPY="$(GCCESP8266PATH)\xtensa-lx106-elf-objcopy.exe"
-OBJDUMP="$(GCCESP8266PATH)\xtensa-lx106-elf-objdump.exe"
+CC="$(GCCESP8266PATH)/xtensa-lx106-elf-gcc"
+CPP="$(GCCESP8266PATH)/xtensa-lx106-elf-g++"
+OBJCOPY="$(GCCESP8266PATH)/xtensa-lx106-elf-objcopy"
+OBJDUMP="$(GCCESP8266PATH)/xtensa-lx106-elf-objdump"
 INCLUDES=-I$(SDK)/include -Isrc/
 CFLAGS=-Wall -Wshadow -DICACHE_FLASH -O3 -mlongcalls \
     -mtext-section-literals \
@@ -72,7 +73,8 @@ LIBS=-L$(SDK)/lib -lmain -lnet80211 -lwpa -llwip -lpp -lphy -Wl,--end-group -lgc
 LD_SCRIPT=ld/eagle.app.v6.ld
 LDFLAGS_BUILD_NUMBER=-Xlinker --defsym -Xlinker __BUILD_NUMBER__=$(BUILD_NUMBER)
 LDFLAGS=-nostdlib -Wl,--start-group $(LIBS) -Wl,--relax,--gc-sections $(LDFLAGS_BUILD_NUMBER)
-ESPTOOL2=$(PRJROOT)/Utils/esptool2/V2.0.0/esptool2.exe
+#ESPTOOL2=$(PRJROOT)/Utils/esptool2/V2.0.0/esptool2.exe
+ESPTOOL2=${HOME}/src/esptool2/esptool2
 ##############################################################################
 
 

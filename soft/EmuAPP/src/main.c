@@ -1,5 +1,7 @@
 #include "ets.h"
 
+#include "gpio_lib.h"
+
 #include "tv.h"
 #include "ps2.h"
 //#include "keymap.h"
@@ -169,7 +171,7 @@ static void TapeWriteOp (void)
     }
 
     ffs_cvt_name ((char *) &TapeBuf.U8 [0], (char *) &TapeBuf.U8 [0]);
-    
+
     if (ffs_find ((char *) &TapeBuf.U8 [0]) >= 0) goto BusFault; // Файл уже существует
 
     // Создаем файл
@@ -237,19 +239,24 @@ void main_program(void)
     uint_fast8_t  RunState     = 0;
     // Инитим файловую систему
     ffs_init();
-    
+
     // Инитим экран
     tv_init  ();
     tv_start ();
     // Инитим клавиатуру
     ps2_init ();
-    
+
+	// player ports (177714)
+    gpio_init_output(PLAYER_CLK);
+    gpio_init_output(PLAYER_IN);
+    gpio_init_input_pu(PLAYER_OUT);
+
     // Инитим процессор
     CPU_Init ();
 
     Time = getCycleCount ();
 
-    
+
     // Запускаем эмуляцию
     while (1)
     {
@@ -261,7 +268,7 @@ void main_program(void)
             {
                 CPU_RunInstruction ();
 
-                if (Device_Data.CPU_State.r [7] == 0116142) // 0116076
+                if (Device_Data.CPU_State.r [7] == 0116142 && 0) // 0116076
                 {
                     uint_fast16_t Cmd = Device_Data.CPU_State.r [0];
 
@@ -287,7 +294,7 @@ void main_program(void)
                 Time += (uint32_t) (NewT - T) * 53;
                 T     = NewT;
 
-                if (Device_Data.CPU_State.r [7] == 0116142) // 0116076
+                if (Device_Data.CPU_State.r [7] == 0116142 && 0) // 0116076
                 {
                     uint_fast16_t Cmd = Device_Data.CPU_State.r [0];
 
@@ -326,8 +333,10 @@ void main_program(void)
             case 4:
                 ps2_leds ((Key_Flags >> KEY_FLAGS_CAPSLOCK_POS) & 1, (Key_Flags >> KEY_FLAGS_NUMLOCK_POS) & 1, (Key_Flags >> KEY_FLAGS_TURBO_POS) & 1);
 
+				/*
                 if (Key_Flags & KEY_FLAGS_NUMLOCK) MEM16 [0177714 >> 1] = (uint16_t) (Key_Flags >> KEY_FLAGS_UP_POS);
                 else                               MEM16 [0177714 >> 1] = 0;
+				*/
 
                 if (CodeAndFlags & 0x8000U)
                 {

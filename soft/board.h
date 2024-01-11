@@ -2,14 +2,17 @@
 #define BOARD_H
 
 
-//#define DO_DEBUG
+#define DO_DEBUG
 
 #ifdef DO_DEBUG
     // NodeMCU debug
-    #define TV_SYNC	15
+    #define TV_SYNC	    15
     #define PS2_DATA	13
-    #define PS2_CLK	12
-    #define BEEPER	14
+    #define PS2_CLK	    12
+    //#define BEEPER	    14
+	#define PLAYER_CLK  4
+	#define PLAYER_IN   5
+	#define PLAYER_OUT  14
 #else
     // ESP-01 LUT
     #define TV_SYNC	1

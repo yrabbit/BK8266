@@ -1,4 +1,4 @@
-#include <stdlib.h> 
+#include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -178,6 +178,24 @@ void CPU_TimerRun (void)
     }
 }
 
+void Read_177714(void) {
+	//ets_printf("Read 177714\n");
+}
+
+void Write_177714(uint16_t Word) {
+	//ets_printf("Write 177714 %x\n", Word);
+	if (Word & 1) {
+		gpio_off(PLAYER_CLK);
+	} else {
+		gpio_on(PLAYER_CLK);
+	}
+	if (Word & 2) {
+		gpio_off(PLAYER_IN);
+	} else {
+		gpio_on(PLAYER_IN);
+	}
+}
+
 TCPU_Arg CPU_ReadMemW (TCPU_Arg Adr)
 {
     if (Adr < 0177600) return MEM16 [Adr >> 1];
@@ -190,7 +208,7 @@ TCPU_Arg CPU_ReadMemW (TCPU_Arg Adr)
         case (0177706 >> 1): break;
         case (0177710 >> 1): CPU_TimerRun (); break;
         case (0177712 >> 1): CPU_TimerRun (); break;
-        case (0177714 >> 1): break;
+        case (0177714 >> 1): Read_177714(); break;
         case (0177716 >> 1): break;
 
         default: return CPU_ARG_READ_ERR;
@@ -211,7 +229,7 @@ TCPU_Arg CPU_ReadMemB (TCPU_Arg Adr)
         case (0177706 >> 1): break;
         case (0177710 >> 1): CPU_TimerRun (); break;
         case (0177712 >> 1): CPU_TimerRun (); break;
-        case (0177714 >> 1): break;
+        case (0177714 >> 1): Read_177714(); break;
         case (0177716 >> 1): break;
 
         default: return CPU_ARG_READ_ERR;
@@ -263,7 +281,7 @@ TCPU_Arg CPU_WriteW (TCPU_Arg Adr, uint_fast16_t Word)
             break;
 
 //      case (0177662 >> 1):
-            
+
         case (0177664 >> 1):
 
             PrevWord = MEM16 [Adr >> 1];
@@ -294,7 +312,8 @@ TCPU_Arg CPU_WriteW (TCPU_Arg Adr, uint_fast16_t Word)
         case (0177714 >> 1):
 
             Device_Data.SysRegs.WrReg177714 = (uint16_t) Word;
-
+			Write_177714(Word);
+			/*
             {
                 uint_fast32_t Reg = (Word & 0xFF) >> 1;
                 if (Device_Data.SysRegs.WrReg177716 & 0100) Reg += 0x80;
@@ -302,7 +321,7 @@ TCPU_Arg CPU_WriteW (TCPU_Arg Adr, uint_fast16_t Word)
                                                           | (Reg << SIGMA_DELTA_TARGET_S)
                                                           | (1 << SIGMA_DELTA_PRESCALAR_S));
             }
-
+			*/
             break;
 
         case (0177716 >> 1):
@@ -361,7 +380,7 @@ TCPU_Arg CPU_WriteB (TCPU_Arg Adr, uint_fast8_t Byte)
             break;
 
 //      case (0177662 >> 1):
-            
+
         case (0177664 >> 1):
 
             PrevWord = MEM16 [Adr >> 1];
@@ -392,7 +411,7 @@ TCPU_Arg CPU_WriteB (TCPU_Arg Adr, uint_fast8_t Byte)
         case (0177714 >> 1):
 
             Device_Data.SysRegs.WrReg177714 = (uint16_t) Word;
-
+			/*
             {
                 uint_fast32_t Reg = (Word & 0xFF) >> 1;
                 if (Device_Data.SysRegs.WrReg177716 & 0100) Reg += 0x80;
@@ -400,7 +419,7 @@ TCPU_Arg CPU_WriteB (TCPU_Arg Adr, uint_fast8_t Byte)
                                                           | (Reg << SIGMA_DELTA_TARGET_S)
                                                           | (1 << SIGMA_DELTA_PRESCALAR_S));
             }
-
+			*/
             break;
 
         case (0177716 >> 1):
@@ -1763,7 +1782,7 @@ void CPU_RunInstruction (void)
                     CPU_CALC_TIMING_D (CPU_timing_OneOps_CLR);
                     break;
 
-          default:  goto InvalidOpCode;          
+          default:  goto InvalidOpCode;
                     // 1065-1066
                     // 1070-1077
         }
@@ -1854,7 +1873,7 @@ void CPU_Reset (void)
 {
 /*
     memset (&Device_Data, 0, sizeof (Device_Data));
-    
+
 
 //  MEM16 [0177660 >> 1] = 0;
 //  MEM16 [0177662 >> 1] = 0;
@@ -1884,20 +1903,22 @@ void CPU_Init (void)
     //============================================================================
     //STEP 1: SIGMA-DELTA CONFIG;REG SETUP
 
+	/*
     WRITE_PERI_REG (GPIO_SIGMA_DELTA_ADDRESS,   SIGMA_DELTA_ENABLE
                                               | (0x80 << SIGMA_DELTA_TARGET_S)
                                               | (1 << SIGMA_DELTA_PRESCALAR_S));
+											  */
 
     //============================================================================
     //STEP 2: PIN FUNC CONFIG :SET PIN TO GPIO MODE AND ENABLE OUTPUT
 
     // Инитим порт пищалки
-    gpio_init_output(BEEPER);
+    //gpio_init_output(BEEPER);
 //  gpio_on         (BEEPER);
 
     //============================================================================
     //STEP 3: CONNECT SIGNAL TO GPIO PAD
-    WRITE_PERI_REG (PERIPHS_GPIO_BASEADDR + (10 + BEEPER) * 4, READ_PERI_REG (PERIPHS_GPIO_BASEADDR + (10 + BEEPER) * 4) | 1);
+    //WRITE_PERI_REG (PERIPHS_GPIO_BASEADDR + (10 + BEEPER) * 4, READ_PERI_REG (PERIPHS_GPIO_BASEADDR + (10 + BEEPER) * 4) | 1);
 }
 
 char CPU_koi8_to_zkg (char C)
