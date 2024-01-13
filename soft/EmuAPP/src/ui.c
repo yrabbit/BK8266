@@ -61,18 +61,18 @@ void ui_draw_text(uint8_t x, uint8_t y, const char *s)
 int8_t ui_select(uint8_t x, uint8_t y, uint8_t count)
 {
     uint8_t n=0, prev=0;
-    
+
     while (1)
     {
     // Очищаем предыдущую позицию
     ui_draw_text (x + (prev / 16)*16, y + (prev % 16), "   ");
-    
+
     // Рисуем новую позицию
     ui_draw_text (x + (n    / 16)*16, y + (n    % 16), "-->");
 
     // Сохраняем текущую позицию как предыдущую для перерисовки
     prev=n;
-    
+
     // Читаем клаву
     while (1)
     {
@@ -130,7 +130,7 @@ const char* ui_input_text(const char *comment, const char *_text, uint8_t max_le
     static char text[64];
     uint8_t pos;
     uint_fast16_t c;
-    
+
 #define EDIT_X  0
 #define EDIT_Y  4
     if (_text)
@@ -144,7 +144,7 @@ const char* ui_input_text(const char *comment, const char *_text, uint8_t max_le
     text[0]=0;
     pos=0;
     }
-    
+
     UI_Data.CursorX=EDIT_X+pos;
     UI_Data.CursorY=EDIT_Y;
     ui_clear();
@@ -232,9 +232,9 @@ uint_fast16_t ui_GetKey (void)
     uint_fast16_t CodeAndFlags;
     uint_fast16_t Key;
 
-    ps2_periodic ();
+    //ps2_periodic ();
 
-    CodeAndFlags = ps2_read ();
+    //CodeAndFlags = ps2_read ();
 
     if (CodeAndFlags == 0) return 0;
 
@@ -242,7 +242,7 @@ uint_fast16_t ui_GetKey (void)
 
     Key = Key_Translate (CodeAndFlags | KEY_TRANSLATE_UI);
 
-    ps2_leds ((Key_Flags >> KEY_FLAGS_CAPSLOCK_POS) & 1, (Key_Flags >> KEY_FLAGS_NUMLOCK_POS) & 1, (Key_Flags >> KEY_FLAGS_TURBO_POS) & 1);
+    //ps2_leds ((Key_Flags >> KEY_FLAGS_CAPSLOCK_POS) & 1, (Key_Flags >> KEY_FLAGS_NUMLOCK_POS) & 1, (Key_Flags >> KEY_FLAGS_TURBO_POS) & 1);
 
     if ((CodeAndFlags & 0x8000U) || (Key == KEY_UNKNOWN)) return 0;
 

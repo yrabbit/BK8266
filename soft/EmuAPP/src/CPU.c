@@ -180,6 +180,12 @@ void CPU_TimerRun (void)
 
 void Read_177714(void) {
 	//ets_printf("Read 177714\n");
+	uint16_t io = gpio_in(PLAYER_OUT);
+	if (io) {
+		MEM16 [0177714 >> 1] = 0x0;
+   	} else {
+		MEM16 [0177714 >> 1] = 0x1;
+	}
 }
 
 void Write_177714(uint16_t Word) {
@@ -328,6 +334,7 @@ TCPU_Arg CPU_WriteW (TCPU_Arg Adr, uint_fast16_t Word)
 
             Device_Data.SysRegs.WrReg177716 = (uint16_t) Word;
 
+			/*
             {
                 uint_fast32_t Reg = *(uint8_t *) &Device_Data.SysRegs.WrReg177714 >> 1;
                 if (Word & 0100) Reg += 0x80;
@@ -335,6 +342,7 @@ TCPU_Arg CPU_WriteW (TCPU_Arg Adr, uint_fast16_t Word)
                                                           | (Reg << SIGMA_DELTA_TARGET_S)
                                                           | (1 << SIGMA_DELTA_PRESCALAR_S));
             }
+			*/
 
             break;
 
@@ -426,13 +434,14 @@ TCPU_Arg CPU_WriteB (TCPU_Arg Adr, uint_fast8_t Byte)
 
             Device_Data.SysRegs.WrReg177716 = (uint16_t) Word;
 
+			/*
             {
                 uint_fast32_t Reg = *(uint8_t *) &Device_Data.SysRegs.WrReg177714 >> 1;
                 if (Word & 0100) Reg += 0x80;
                 WRITE_PERI_REG (GPIO_SIGMA_DELTA_ADDRESS,   SIGMA_DELTA_ENABLE
                                                           | (Reg << SIGMA_DELTA_TARGET_S)
                                                           | (1 << SIGMA_DELTA_PRESCALAR_S));
-            }
+            }*/
 
             break;
 

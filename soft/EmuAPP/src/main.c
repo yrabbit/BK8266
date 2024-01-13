@@ -28,6 +28,16 @@ union
 
 #define CPU_CHECK_ARG_FAULT( Arg) {if (CPU_IS_ARG_FAULT (Arg)) goto BusFault;}
 
+static void PrintR0(void) {
+	ets_printf("R:%x\n\r", Device_Data.CPU_State.r [0]);
+    Device_Data.CPU_State.r [7] = 0100006;
+}
+
+static void PrintZ(void) {
+	ets_printf("Z%x\n\r", Device_Data.CPU_State.r [0]);
+    Device_Data.CPU_State.r [7] = 0100006;
+}
+
 static void TapeReadOp (void)
 {
     uint_fast16_t ParamAdr = MEM16 [0306 >> 1];
@@ -244,12 +254,12 @@ void main_program(void)
     tv_init  ();
     tv_start ();
     // Инитим клавиатуру
-    ps2_init ();
+    //ps2_init ();
 
-	// player ports (177714)
+	// player pins (177714)
     gpio_init_output(PLAYER_CLK);
     gpio_init_output(PLAYER_IN);
-    gpio_init_input_pu(PLAYER_OUT);
+    gpio_init_input(PLAYER_OUT);
 
     // Инитим процессор
     CPU_Init ();
@@ -301,6 +311,13 @@ void main_program(void)
                     if      (Cmd == 3) {TapeReadOp  (); Time = getCycleCount (); T = Device_Data.CPU_State.Time;}
                     else if (Cmd == 2) {TapeWriteOp (); Time = getCycleCount (); T = Device_Data.CPU_State.Time;}
                 }
+                if (Device_Data.CPU_State.r [7] == 0100004) // 0100006
+                {
+                    uint_fast16_t Cmd = Device_Data.CPU_State.r [5];
+
+                   if (Cmd == 0) {PrintR0(); Time = getCycleCount (); T = Device_Data.CPU_State.Time;}
+                   if (Cmd == 1) {PrintZ(); Time = getCycleCount (); T = Device_Data.CPU_State.Time;}
+                }
             }
 
             NewT = getCycleCount ();
@@ -318,11 +335,11 @@ void main_program(void)
                 break;
 
             case 1:
-                ps2_periodic ();
+                //ps2_periodic ();
                 break;
 
             case 2:
-                CodeAndFlags = ps2_read ();
+                //CodeAndFlags = ps2_read ();
                 if (CodeAndFlags == 0) RunState = 5;
                 break;
 
@@ -331,7 +348,7 @@ void main_program(void)
                 break;
 
             case 4:
-                ps2_leds ((Key_Flags >> KEY_FLAGS_CAPSLOCK_POS) & 1, (Key_Flags >> KEY_FLAGS_NUMLOCK_POS) & 1, (Key_Flags >> KEY_FLAGS_TURBO_POS) & 1);
+                //ps2_leds ((Key_Flags >> KEY_FLAGS_CAPSLOCK_POS) & 1, (Key_Flags >> KEY_FLAGS_NUMLOCK_POS) & 1, (Key_Flags >> KEY_FLAGS_TURBO_POS) & 1);
 
 				/*
                 if (Key_Flags & KEY_FLAGS_NUMLOCK) MEM16 [0177714 >> 1] = (uint16_t) (Key_Flags >> KEY_FLAGS_UP_POS);

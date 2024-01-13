@@ -12,7 +12,7 @@
     //#define BEEPER	    14
 	#define PLAYER_CLK  4
 	#define PLAYER_IN   5
-	#define PLAYER_OUT  14
+	#define PLAYER_OUT 12
 #else
     // ESP-01 LUT
     #define TV_SYNC	1
