@@ -29,12 +29,30 @@ union
 #define CPU_CHECK_ARG_FAULT( Arg) {if (CPU_IS_ARG_FAULT (Arg)) goto BusFault;}
 
 static void PrintR0(void) {
-	ets_printf("R:%x\n\r", Device_Data.CPU_State.r [0]);
+	ets_printf("R:%x\n", Device_Data.CPU_State.r [0]);
     Device_Data.CPU_State.r [7] = 0100006;
 }
 
 static void PrintZ(void) {
-	ets_printf("Z%x\n\r", Device_Data.CPU_State.r [0]);
+	ets_printf("Z%x\n", Device_Data.CPU_State.r [0]);
+    Device_Data.CPU_State.r [7] = 0100006;
+}
+
+static void PrintStr(void) {
+	uint_fast16_t adr = Device_Data.CPU_State.r [0];
+	do {
+		uint8_t ch = CPU_ReadMemB(adr++) & 0xFFU;
+		if (!ch) {
+			break;
+		}
+	    ets_printf("%c", ch);
+	} while(1);
+	ets_printf("\n");
+    Device_Data.CPU_State.r [7] = 0100006;
+}
+
+static void PrintR0D(void) {
+	ets_printf("%d ", Device_Data.CPU_State.r [0]);
     Device_Data.CPU_State.r [7] = 0100006;
 }
 
@@ -317,6 +335,8 @@ void main_program(void)
 
                    if (Cmd == 0) {PrintR0(); Time = getCycleCount (); T = Device_Data.CPU_State.Time;}
                    if (Cmd == 1) {PrintZ(); Time = getCycleCount (); T = Device_Data.CPU_State.Time;}
+                   if (Cmd == 2) {PrintStr(); Time = getCycleCount (); T = Device_Data.CPU_State.Time;}
+                   if (Cmd == 3) {PrintR0D(); Time = getCycleCount (); T = Device_Data.CPU_State.Time;}
                 }
             }
 
